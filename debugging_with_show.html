@@ -2,11 +2,11 @@
 <html class="no-js" lang="en">
 
 <head>
-<title>Generating JSON from Bosatsu Values · Bosatsu Documentation</title>
+<title>Inspecting Compiled Output with lib show · Bosatsu Documentation</title>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="description" content='paradox docs'/>
-<link rel="canonical" href="https://github.com/johnynek/bosatsugenerating_json.html"/>
+<link rel="canonical" href="https://github.com/johnynek/bosatsudebugging_with_show.html"/>
 <link href="https://fonts.googleapis.com/css?family=Roboto:100normal,100italic,300normal,300italic,400normal,400italic,500normal,500italic,700normal,700italic,900normal,900italicc" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="lib/jquery/jquery.min.js"></script>
 <script type="text/javascript" src="js/page.js"></script>
@@ -47,9 +47,9 @@
   <li><a href="getting_started.html" class="page">Getting started (new repo)</a></li>
   <li><a href="language_guide.html" class="page">Language Guide</a></li>
   <li><a href="recursion.html" class="page">Recursion in Bosatsu</a></li>
-  <li><a href="generating_json.html" class="active page">Generating JSON from Bosatsu Values</a></li>
+  <li><a href="generating_json.html" class="page">Generating JSON from Bosatsu Values</a></li>
   <li><a href="debugging_with_eval.html" class="page">Debugging with <code>lib eval</code></a></li>
-  <li><a href="debugging_with_show.html" class="page">Inspecting Compiled Output with <code>lib show</code></a></li>
+  <li><a href="debugging_with_show.html" class="active page">Inspecting Compiled Output with <code>lib show</code></a></li>
   <li><a href="transpile_python.html" class="page">Compiling to Python</a></li>
   <li><a href="generated/core_alpha/index.html" class="page">Core Alpha API</a>
   <ul>
@@ -156,9 +156,9 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
   <li><a href="getting_started.html" class="page">Getting started (new repo)</a></li>
   <li><a href="language_guide.html" class="page">Language Guide</a></li>
   <li><a href="recursion.html" class="page">Recursion in Bosatsu</a></li>
-  <li><a href="generating_json.html" class="active page">Generating JSON from Bosatsu Values</a></li>
+  <li><a href="generating_json.html" class="page">Generating JSON from Bosatsu Values</a></li>
   <li><a href="debugging_with_eval.html" class="page">Debugging with <code>lib eval</code></a></li>
-  <li><a href="debugging_with_show.html" class="page">Inspecting Compiled Output with <code>lib show</code></a></li>
+  <li><a href="debugging_with_show.html" class="active page">Inspecting Compiled Output with <code>lib show</code></a></li>
   <li><a href="transpile_python.html" class="page">Compiling to Python</a></li>
   <li><a href="generated/core_alpha/index.html" class="page">Core Alpha API</a>
   <ul>
@@ -235,7 +235,7 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 <div class="nav-breadcrumbs">
 <ul>
   <li><a href="index.html">Bosatsu Documentation</a></li>
-  <li>Generating JSON from Bosatsu Values</li>
+  <li>Inspecting Compiled Output with <code>lib show</code></li>
 </ul>
 </div>
 </div>
@@ -243,88 +243,44 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 
 <div class="page-content row">
 <div class="small-12 large-9 column" id="docs">
-<h1><a href="#generating-json-from-bosatsu-values" name="generating-json-from-bosatsu-values" class="anchor"><span class="anchor-link"></span></a>Generating JSON from Bosatsu Values</h1>
-<p>Bosatsu can be used as a typed configuration language and then rendered to JSON with <code>lib json</code>.</p>
-<p>This page focuses on <code>lib json</code> (not <code>tool json</code>).</p>
-<h2><a href="#quick-start" name="quick-start" class="anchor"><span class="anchor-link"></span></a>Quick start</h2>
-<ol>
-  <li>Typecheck as you iterate:</li>
-</ol>
-<pre class="prettyprint"><code class="language-bash">./bosatsuj lib check --name core_alpha
+<h1><a href="#inspecting-compiled-output-with-lib-show" name="inspecting-compiled-output-with-lib-show" class="anchor"><span class="anchor-link"></span></a>Inspecting Compiled Output with <code>lib show</code></h1>
+<p><code>lib show</code> prints fully typechecked package data as EDN. It is useful when you want to inspect what Bosatsu inferred and what the compiler is lowering.</p>
+<h2><a href="#quick-examples" name="quick-examples" class="anchor"><span class="anchor-link"></span></a>Quick examples</h2>
+<p>All commands below assume running from this repository root.</p>
+<h3><a href="#show-a-whole-package" name="show-a-whole-package" class="anchor"><span class="anchor-link"></span></a>Show a whole package</h3>
+<pre class="prettyprint"><code class="language-bash">./bosatsuj lib show --name core_alpha --package Bosatsu/Char --color none
 </code></pre>
-<ol>
-  <li>Generate JSON for a value:</li>
-</ol>
-<pre class="prettyprint"><code class="language-bash">./bosatsuj lib json write --name core_alpha --main Bosatsu/Example/Json/Github/Workflows/Ci::workflow
+<p>This prints one <code>(package ...)</code> form with sections like <code>:imports</code>, <code>:types</code>, <code>:externals</code>, and <code>:defs</code>.</p>
+<h3><a href="#show-a-single-type" name="show-a-single-type" class="anchor"><span class="anchor-link"></span></a>Show a single type</h3>
+<pre class="prettyprint"><code class="language-bash">./bosatsuj lib show --name core_alpha --type Bosatsu/Option::Option --color none
 </code></pre>
-<h2><a href="#command-reference" name="command-reference" class="anchor"><span class="anchor-link"></span></a>Command reference</h2>
-<pre class="prettyprint"><code class="language-bash">./bosatsuj lib json write [--repo_root &lt;path&gt;] [--name &lt;lib_name&gt;] --main &lt;valueIdent&gt; [--output &lt;path&gt;]
+<p>Use <code>--type &lt;package::Type&gt;</code> when you only want one type definition instead of the full package.</p>
+<h3><a href="#show-a-single-value" name="show-a-single-value" class="anchor"><span class="anchor-link"></span></a>Show a single value</h3>
+<pre class="prettyprint"><code class="language-bash">./bosatsuj lib show --name core_alpha --value Bosatsu/Num/Binary::not --color none
 </code></pre>
-<p>Common flags:</p>
-<ul>
-  <li><code>--name</code>: library name from your <code>bosatsu_libs.json</code></li>
-  <li><code>--main</code>: package/value to evaluate and encode</li>
-  <li><code>--output</code>: write JSON to a file instead of stdout</li>
-</ul>
-<h2><a href="#encoding-shape" name="encoding-shape" class="anchor"><span class="anchor-link"></span></a>Encoding shape</h2>
-<p><code>lib json</code> uses type-directed encoding:</p>
-<ul>
-  <li><code>Int</code> -&gt; JSON number</li>
-  <li><code>Float64</code> -&gt; JSON number</li>
-  <li><code>String</code> -&gt; JSON string</li>
-  <li><code>Bool</code> -&gt; JSON boolean</li>
-  <li><code>List[a]</code> -&gt; JSON array</li>
-  <li><code>Dict[String, a]</code> -&gt; JSON object</li>
-  <li><code>struct</code> -&gt; JSON object</li>
-  <li><code>enum</code> -&gt; JSON object (constructors must remain distinguishable after encoding)</li>
-</ul>
-<h2><a href="#option-behavior" name="option-behavior" class="anchor"><span class="anchor-link"></span></a><code>Option</code> behavior</h2>
-<p><code>Option</code> is especially useful for configuration records:</p>
-<ul>
-  <li><code>None</code> encodes as <code>null</code> when that is unambiguous</li>
-  <li><code>Some(x)</code> encodes as <code>x</code></li>
-  <li>Nested options (<code>Option[Option[a]]</code>) use array encoding to avoid ambiguity:</li>
-  <li>outer <code>None</code> -&gt; <code>[]</code></li>
-  <li>outer <code>Some(None)</code> -&gt; <code>[null]</code></li>
-  <li>outer <code>Some(Some(x))</code> -&gt; <code>[x]</code></li>
-</ul>
-<p>For record fields, <code>Option</code> lets you model shape variation directly:</p>
-<pre class="prettyprint"><code class="language-bosatsu">struct Step(
-  uses: Option[String],
-  run: Option[String],
-  with: Option[WithConfig],
-)
+<p>Use <code>--value &lt;package::value&gt;</code> to focus on one top-level value. This selects values that exist in compiled package output. If a helper value is fully inlined or otherwise eliminated, it will not be available by name.</p>
+<p>You can mix selectors:</p>
+<pre class="prettyprint"><code class="language-bash">./bosatsuj lib show --name core_alpha \
+  --package Bosatsu/Char \
+  --type Bosatsu/Option::Option \
+  --value Bosatsu/Num/Binary::not \
+  --color none
 </code></pre>
-<p>This usually replaces many near-duplicate structs.</p>
-<h2><a href="#patterns-that-worked-well-for-github-workflow-modeling" name="patterns-that-worked-well-for-github-workflow-modeling" class="anchor"><span class="anchor-link"></span></a>Patterns that worked well for GitHub workflow modeling</h2>
-<ul>
-  <li>Put shared types/constants/helpers in a common module (for example <code>Util.bosatsu</code>)</li>
-  <li>Use constants for repeated literals (runner names, action versions, <code>17</code>, step labels)</li>
-  <li>Use helper functions for multi-line shell scripts (for example <code>cat_lines</code>)</li>
-  <li>Prefer one record with <code>Option[...]</code> fields over many one-off variants</li>
-  <li>Use backticks only when a field is not a valid bindable name, such as <code>`runs-on`</code> and <code>`timeout-minutes`</code></li>
-</ul>
-<h2><a href="#practical-gotchas" name="practical-gotchas" class="anchor"><span class="anchor-link"></span></a>Practical gotchas</h2>
-<ul>
-  <li>Keep running <code>lib check</code> while editing models; it catches most mistakes before JSON generation.</li>
-  <li>JSON field names come from your Bosatsu field names exactly.</li>
-  <li><code>Float64</code> JSON encoding requires finite values; <code>.NaN</code>, <code>∞</code>, and <code>-∞</code> are not valid JSON numbers.</li>
-  <li>If your consumer treats absent and <code>null</code> differently, model that intentionally and test it.</li>
-  <li><code>lib json write</code> requires a serializable value. Function-typed mains are rejected.</li>
-</ul>
-<h2><a href="#full-commands-used-in-this-workflow-example" name="full-commands-used-in-this-workflow-example" class="anchor"><span class="anchor-link"></span></a>Full commands used in this workflow example</h2>
-<p>These are the exact commands used to generate the four workflow values modeled in this example:</p>
-<pre class="prettyprint"><code class="language-bash">./bosatsuj lib json write --name core_alpha --main Bosatsu/Example/Json/Github/Workflows/Ci::workflow
-./bosatsuj lib json write --name core_alpha --main Bosatsu/Example/Json/Github/Workflows/CodecovMain::workflow
-./bosatsuj lib json write --name core_alpha --main Bosatsu/Example/Json/Github/Workflows/DeployWeb::workflow
-./bosatsuj lib json write --name core_alpha --main Bosatsu/Example/Json/Github/Workflows/Release::workflow
+<p>If no <code>--package</code>, <code>--type</code>, or <code>--value</code> is given, <code>lib show</code> shows all local library packages (the existing default behavior).</p>
+<h2><a href="#why-this-helps" name="why-this-helps" class="anchor"><span class="anchor-link"></span></a>Why this helps</h2>
+<h3><a href="#see-inferred-types-on-values" name="see-inferred-types-on-values" class="anchor"><span class="anchor-link"></span></a>See inferred types on values</h3>
+<p>Entries in <code>:defs</code> include typed expressions, so you can inspect the inferred type information attached to each value.</p>
+<h3><a href="#see-tail-recursive-lowering-shape" name="see-tail-recursive-lowering-shape" class="anchor"><span class="anchor-link"></span></a>See tail-recursive lowering shape</h3>
+<p>When tail recursion is optimized, <code>lib show</code> exposes loop-like forms such as <code>loop</code>/<code>recur</code> in the typed expression. For example:</p>
+<pre class="prettyprint"><code class="language-bash">./bosatsuj lib show --name core_alpha --package Bosatsu/FibBench --color none
 </code></pre>
+<p>In that package, the source helper <code>list_len</code> is inlined into another compiled definition, and you can still see the loop-like lowered shape there. This is a practical way to confirm code that should compile to loops in backends.</p>
 <div class="source-github">
-The source code for this page can be found <a href="https://github.com/johnynek/bosatsu/tree/master/docs/src/main/paradox/generating_json.md">here</a>.
+The source code for this page can be found <a href="https://github.com/johnynek/bosatsu/tree/master/docs/src/main/paradox/debugging_with_show.md">here</a>.
 </div>
 
 <div class="nav-next">
-<p><strong>Next:</strong> <a href="debugging_with_eval.html">Debugging with <code>lib eval</code></a></p>
+<p><strong>Next:</strong> <a href="transpile_python.html">Compiling to Python</a></p>
 </div>
 </div>
 <div class="large-3 show-for-large column" data-sticky-container>
@@ -333,15 +289,10 @@ The source code for this page can be found <a href="https://github.com/johnynek/
 <div class="nav-title">On this page:</div>
 <div class="nav-toc">
 <ul>
-  <li><a href="generating_json.html#generating-json-from-bosatsu-values" class="header">Generating JSON from Bosatsu Values</a>
+  <li><a href="debugging_with_show.html#inspecting-compiled-output-with-lib-show" class="header">Inspecting Compiled Output with <code>lib show</code></a>
   <ul>
-    <li><a href="generating_json.html#quick-start" class="header">Quick start</a></li>
-    <li><a href="generating_json.html#command-reference" class="header">Command reference</a></li>
-    <li><a href="generating_json.html#encoding-shape" class="header">Encoding shape</a></li>
-    <li><a href="generating_json.html#option-behavior" class="header"><code>Option</code> behavior</a></li>
-    <li><a href="generating_json.html#patterns-that-worked-well-for-github-workflow-modeling" class="header">Patterns that worked well for GitHub workflow modeling</a></li>
-    <li><a href="generating_json.html#practical-gotchas" class="header">Practical gotchas</a></li>
-    <li><a href="generating_json.html#full-commands-used-in-this-workflow-example" class="header">Full commands used in this workflow example</a></li>
+    <li><a href="debugging_with_show.html#quick-examples" class="header">Quick examples</a></li>
+    <li><a href="debugging_with_show.html#why-this-helps" class="header">Why this helps</a></li>
   </ul></li>
 </ul>
 </div>
