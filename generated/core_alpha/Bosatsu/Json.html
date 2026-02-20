@@ -2,11 +2,11 @@
 <html class="no-js" lang="en">
 
 <head>
-<title>Bo/Test · Bosatsu Documentation</title>
+<title>Bosatsu/Json · Bosatsu Documentation</title>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="description" content='paradox docs'/>
-<link rel="canonical" href="https://github.com/johnynek/bosatsugenerated/core_alpha/Bo/Test.html"/>
+<link rel="canonical" href="https://github.com/johnynek/bosatsugenerated/core_alpha/Bosatsu/Json.html"/>
 <link href="https://fonts.googleapis.com/css?family=Roboto:100normal,100italic,300normal,300italic,400normal,400italic,500normal,500italic,700normal,700italic,900normal,900italicc" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="../../../lib/jquery/jquery.min.js"></script>
 <script type="text/javascript" src="../../../js/page.js"></script>
@@ -110,7 +110,7 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 <ul>
   <li><a href="../../../index.html">Bosatsu Documentation</a></li>
   <li><a href="../../../generated/core_alpha/index.html">Core Alpha API</a></li>
-  <li><code>Bo/Test</code></li>
+  <li><code>Bosatsu/Json</code></li>
 </ul>
 </div>
 </div>
@@ -118,17 +118,77 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 
 <div class="page-content row">
 <div class="small-12 large-9 column" id="docs">
-<h1><a href="#bo-test" name="bo-test" class="anchor"><span class="anchor-link"></span></a><code>Bo/Test</code></h1>
-<p>No exported values or types.</p>
+<h1><a href="#bosatsu-json" name="bosatsu-json" class="anchor"><span class="anchor-link"></span></a><code>Bosatsu/Json</code></h1>
+<h2><a href="#index" name="index" class="anchor"><span class="anchor-link"></span></a>Index</h2>
+<ul>
+  <li>Types: <a href="#type-json"><code>Json</code></a>, <a href="#type-nullable"><code>Nullable</code></a>, <a href="#type-optional"><code>Optional</code></a></li>
+  <li>Values: <a href="#value-eq-json"><code>eq_Json</code></a>, <a href="#value-parse-json"><code>parse_Json</code></a>, <a href="#value-render-json"><code>render_Json</code></a></li>
+</ul>
+<h2><a href="#types" name="types" class="anchor"><span class="anchor-link"></span></a>Types</h2>
+<a id="type-json"></a>
+<h3><a href="#json" name="json" class="anchor"><span class="anchor-link"></span></a><code>Json</code></h3>
+<pre class="prettyprint"><code class="language-bosatsu">type Json
+</code></pre>
+<h4><a href="#constructors" name="constructors" class="anchor"><span class="anchor-link"></span></a>Constructors</h4>
+<ul>
+  <li><code>JArray(items: List[Json])</code></li>
+  <li><code>JBool(value: Bool)</code></li>
+  <li><code>JFloat(value: Float64)</code></li>
+  <li><code>JInt(value: Int)</code></li>
+  <li><code>JNull</code></li>
+  <li><code>JObject(items: List[(String, Json)])</code></li>
+  <li><code>JString(value: String)</code></li>
+</ul>
+<a id="type-nullable"></a>
+<h3><a href="#nullable-a-" name="nullable-a-" class="anchor"><span class="anchor-link"></span></a><code>Nullable[a]</code></h3>
+<pre class="prettyprint"><code class="language-bosatsu">type Nullable[a: +*]
+</code></pre>
+<h4><a href="#constructors" name="constructors" class="anchor"><span class="anchor-link"></span></a>Constructors</h4>
+<ul>
+  <li><code>NonNull(value: a)</code></li>
+  <li><code>Null</code></li>
+</ul>
+<a id="type-optional"></a>
+<h3><a href="#optional-a-" name="optional-a-" class="anchor"><span class="anchor-link"></span></a><code>Optional[a]</code></h3>
+<pre class="prettyprint"><code class="language-bosatsu">type Optional[a: +*]
+</code></pre>
+<h4><a href="#constructors" name="constructors" class="anchor"><span class="anchor-link"></span></a>Constructors</h4>
+<ul>
+  <li><code>Missing</code></li>
+  <li><code>Set(value: a)</code></li>
+</ul>
+<h2><a href="#values" name="values" class="anchor"><span class="anchor-link"></span></a>Values</h2>
+<a id="value-eq-json"></a>
+<h3><a href="#eq-json" name="eq-json" class="anchor"><span class="anchor-link"></span></a><code>eq_Json</code></h3>
+<pre class="prettyprint"><code class="language-bosatsu">def eq_Json(left: Json, right: Json) -&gt; Bool
+</code></pre>
+<a id="value-parse-json"></a>
+<h3><a href="#parse-json" name="parse-json" class="anchor"><span class="anchor-link"></span></a><code>parse_Json</code></h3>
+<pre class="prettyprint"><code class="language-bosatsu">def parse_Json(s: String) -&gt; Option[Json]
+</code></pre>
+<a id="value-render-json"></a>
+<h3><a href="#render-json" name="render-json" class="anchor"><span class="anchor-link"></span></a><code>render_Json</code></h3>
+<pre class="prettyprint"><code class="language-bosatsu">def render_Json(j: Json) -&gt; String
+</code></pre>
 <div class="source-github">
-The source code for this page can be found <a href="https://github.com/johnynek/bosatsu/tree/master/docs/src/main/paradox/generated/core_alpha/Bo/Test.md">here</a>.
+The source code for this page can be found <a href="https://github.com/johnynek/bosatsu/tree/master/docs/src/main/paradox/generated/core_alpha/Bosatsu/Json.md">here</a>.
 </div>
 
 <div class="nav-next">
-<p><strong>Next:</strong> <a href="../../../generated/core_alpha/Bosatsu/Bool.html"><code>Bosatsu/Bool</code></a></p>
+<p><strong>Next:</strong> <a href="../../../generated/core_alpha/Bosatsu/List.html"><code>Bosatsu/List</code></a></p>
 </div>
 </div>
 <div class="large-3 show-for-large column" data-sticky-container>
+<nav class="sidebar sticky" data-sticky data-anchor="docs" data-sticky-on="large">
+<div class="page-nav">
+<div class="nav-title">On this page:</div>
+<div class="nav-toc">
+<ul>
+  <li><a href="../../../generated/core_alpha/Bosatsu/Json.html#bosatsu-json" class="header"><code>Bosatsu/Json</code></a></li>
+</ul>
+</div>
+</div>
+</nav>
 </div>
 </div>
 

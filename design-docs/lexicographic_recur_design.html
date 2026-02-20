@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+
+<head>
+<title>Lexicographic recur Tuple Design · Bosatsu Documentation</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="description" content='paradox docs'/>
+<link rel="canonical" href="https://github.com/johnynek/bosatsudesign-docs/lexicographic_recur_design.html"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:100normal,100italic,300normal,300italic,400normal,400italic,500normal,500italic,700normal,700italic,900normal,900italicc" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="../lib/jquery/jquery.min.js"></script>
+<script type="text/javascript" src="../js/page.js"></script>
+<script type="text/javascript" src="../js/warnOldVersion.js"></script>
+<script type="text/javascript" src="../js/groups.js"></script>
+<script type="text/javascript" src="../js/snippets.js"></script>
+<link rel="stylesheet" type="text/css" href="../lib/foundation/dist/foundation.min.css"/>
+<link rel="stylesheet" type="text/css" href="../css/page.css"/>
+
+<!--
+<link rel="shortcut icon" href="../images/favicon.ico" />
+-->
+</head>
+
+<body>
+<div class="off-canvas-wrapper">
+<div class="off-canvas-wrapper-inner" data-off-canvas-wrapper>
+
+<div class="off-canvas position-left" id="off-canvas-menu" data-off-canvas>
+<nav class="off-canvas-nav">
+<div class="nav-home">
+<a href="../index.html" >
+<span class="home-icon">⌂</span>Bosatsu Documentation
+</a>
+<div class="version-number">
+0.0.0+1-b32eeaff*
+</div>
+</div>
+<div class="nav-toc">
+<ul>
+  <li><a href="../design.html" class="page">Bosatsu Design Philosophy and Goals</a></li>
+  <li><a href="../design-docs/index.html" class="page">Design Docs</a></li>
+  <li><a href="../getting_started.html" class="page">Getting started (new repo)</a></li>
+  <li><a href="../language_guide.html" class="page">Language Guide</a></li>
+  <li><a href="../recursion.html" class="page">Recursion in Bosatsu</a></li>
+  <li><a href="../generating_json.html" class="page">Generating JSON from Bosatsu Values</a></li>
+  <li><a href="../debugging_with_eval.html" class="page">Debugging with <code>lib eval</code></a></li>
+  <li><a href="../debugging_with_show.html" class="page">Inspecting Compiled Output with <code>lib show</code></a></li>
+  <li><a href="../transpile_python.html" class="page">Compiling to Python</a></li>
+  <li><a href="../generated/core_alpha/index.html" class="page">Core Alpha API</a></li>
+</ul>
+</div>
+
+</nav>
+</div>
+
+<div class="off-canvas-content" data-off-canvas-content>
+
+<header class="site-header expanded row">
+<div class="small-12 column">
+<a href="#" class="off-canvas-toggle hide-for-medium" data-toggle="off-canvas-menu"><svg class="svg-icon svg-icon-menu" version="1.1" id="Menu" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 20 20" enable-background="new 0 0 20 20" xml:space="preserve"> <path class="svg-icon-menu-path" fill="#53CDEC" d="M16.4,9H3.6C3.048,9,3,9.447,3,10c0,0.553,0.048,1,0.6,1H16.4c0.552,0,0.6-0.447,0.6-1C17,9.447,16.952,9,16.4,9z M16.4,13
+H3.6C3.048,13,3,13.447,3,14c0,0.553,0.048,1,0.6,1H16.4c0.552,0,0.6-0.447,0.6-1C17,13.447,16.952,13,16.4,13z M3.6,7H16.4
+C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.048,7,3.6,7z"/></svg>
+</a>
+<div class="title"><a href="../index.html">Bosatsu Documentation</a></div>
+
+<!--
+<a href="https://www.example.com" class="logo show-for-medium">logo</a>
+-->
+</div>
+</header>
+
+<div class="expanded row">
+
+<div class="medium-3 large-2 show-for-medium column">
+<nav class="site-nav">
+<div class="nav-home">
+<a href="../index.html" >
+<span class="home-icon">⌂</span>Bosatsu Documentation
+</a>
+<div class="version-number">
+0.0.0+1-b32eeaff*
+</div>
+</div>
+<div class="nav-toc">
+<ul>
+  <li><a href="../design.html" class="page">Bosatsu Design Philosophy and Goals</a></li>
+  <li><a href="../design-docs/index.html" class="page">Design Docs</a></li>
+  <li><a href="../getting_started.html" class="page">Getting started (new repo)</a></li>
+  <li><a href="../language_guide.html" class="page">Language Guide</a></li>
+  <li><a href="../recursion.html" class="page">Recursion in Bosatsu</a></li>
+  <li><a href="../generating_json.html" class="page">Generating JSON from Bosatsu Values</a></li>
+  <li><a href="../debugging_with_eval.html" class="page">Debugging with <code>lib eval</code></a></li>
+  <li><a href="../debugging_with_show.html" class="page">Inspecting Compiled Output with <code>lib show</code></a></li>
+  <li><a href="../transpile_python.html" class="page">Compiling to Python</a></li>
+  <li><a href="../generated/core_alpha/index.html" class="page">Core Alpha API</a></li>
+</ul>
+</div>
+
+</nav>
+</div>
+
+<div class="small-12 medium-9 large-10 column">
+<section class="site-content">
+
+<span id="version-warning"></span>
+
+<div class="page-header row">
+<div class="medium-12 show-for-medium column">
+<div class="nav-breadcrumbs">
+<ul>
+  <li><a href="../index.html">Bosatsu Documentation</a></li>
+  <li><a href="../design-docs/index.html">Design Docs</a></li>
+  <li>Lexicographic <code>recur</code> Tuple Design</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div class="page-content row">
+<div class="small-12 large-9 column" id="docs">
+<h1><a href="#lexicographic-recur-tuple-design" name="lexicographic-recur-tuple-design" class="anchor"><span class="anchor-link"></span></a>Lexicographic <code>recur</code> Tuple Design</h1>
+<p>Status: proposed<br/>Date: 2026-02-19 Tracking issue: <a href="https://github.com/johnynek/bosatsu/issues/1720">#1720</a></p>
+<h2><a href="#goal" name="goal" class="anchor"><span class="anchor-link"></span></a>Goal</h2>
+<p>Allow direct Ackermann-style recursion with tuple <code>recur</code> targets, while preserving totality:</p>
+<pre class="prettyprint"><code class="language-bosatsu">def ack(n: Nat, m: Nat) -&gt; Nat:
+  recur (n, m):
+    case (Zero, _): Succ(m)
+    case (Succ(n_prev), Zero): ack(n_prev, Succ(Zero))
+    case (Succ(n_prev), Succ(m_prev)): ack(n_prev, ack(n, m_prev))
+</code></pre>
+<p>The acceptance rule is lexicographic decrease in the order written in <code>recur (...)</code>.</p>
+<h2><a href="#non-goals" name="non-goals" class="anchor"><span class="anchor-link"></span></a>Non-goals</h2>
+<ol>
+  <li>General size-change termination analysis.</li>
+  <li>Arithmetic/semantic reasoning (for example, proving <code>x - 1 &lt; x</code> over <code>Int</code>).</li>
+  <li>User-defined measures.</li>
+</ol>
+<h2><a href="#current-behavior-relevant-" name="current-behavior-relevant-" class="anchor"><span class="anchor-link"></span></a>Current Behavior (Relevant)</h2>
+<p><code>DefRecursionCheck</code> currently:</p>
+<ol>
+  <li>Allows only one <code>recur</code> argument position (<code>getRecurIndex</code>).</li>
+  <li>Requires recursive calls to be structurally smaller only in that one position.</li>
+  <li>Does not enforce lexicographic decrease across multiple arguments.</li>
+</ol>
+<p>This is why Ackermann currently needs higher-order encoding (<code>ack1</code> returning <code>Nat -&gt; Nat</code>).</p>
+<h2><a href="#proposed-language-rule" name="proposed-language-rule" class="anchor"><span class="anchor-link"></span></a>Proposed Language Rule</h2>
+<p><code>recur</code> target may be:</p>
+<ol>
+  <li>A single name (existing behavior).</li>
+  <li>A tuple of names, each name bound directly to a function parameter.</li>
+</ol>
+<p>For <code>recur (r0, r1, ..., rk)</code> a recursive call with corresponding call arguments <code>(a0, a1, ..., ak)</code> is legal iff:</p>
+<ol>
+  <li>There exists an index <code>i</code> such that <code>ai</code> is structurally smaller than <code>ri</code> in the current branch.</li>
+  <li>For every <code>j &lt; i</code>, <code>aj</code> is exactly <code>rj</code> (syntactic equality to the original parameter name).</li>
+  <li>Arguments <code>j &gt; i</code> are unrestricted for this specific call.</li>
+</ol>
+<p>This is standard lexicographic descent on a well-founded structural order.</p>
+<p>Why <code>case (Succ(n_prev), Zero): ack(n_prev, Succ(Zero))</code> is safe:</p>
+<ol>
+  <li>The first component decreases (<code>n_prev &lt; n</code> structurally).</li>
+  <li>Lexicographic order permits any second component once an earlier component decreased.</li>
+</ol>
+<h2><a href="#checker-design" name="checker-design" class="anchor"><span class="anchor-link"></span></a>Checker Design</h2>
+<h2><a href="#data-model-changes-in-defrecursioncheck" name="data-model-changes-in-defrecursioncheck" class="anchor"><span class="anchor-link"></span></a>Data model changes in <code>DefRecursionCheck</code></h2>
+<p>Replace the single recursion position with a recursion target vector.</p>
+<p>Current:</p>
+<ol>
+  <li><code>InDefRecurred(..., group: Int, index: Int, ...)</code></li>
+  <li><code>InRecurBranch(..., allowedNames: Set[Bindable])</code></li>
+</ol>
+<p>Proposed:</p>
+<ol>
+  <li>
+  <p><code>RecurTarget</code> = ordered non-empty vector of parameter positions:  <code>NonEmptyList[(groupIndex, argIndex, paramName)]</code></p></li>
+  <li>
+  <p><code>InDefRecurred(..., target: RecurTarget, ...)</code></p></li>
+  <li><code>InRecurBranch(..., allowedPerComponent: NonEmptyList[Set[Bindable]])</code></li>
+</ol>
+<p><code>allowedPerComponent(i)</code> means names proven structurally smaller than target component <code>i</code> in this branch.</p>
+<h2><a href="#target-parsing-getrecurtarget-" name="target-parsing-getrecurtarget-" class="anchor"><span class="anchor-link"></span></a>Target parsing (<code>getRecurTarget</code>)</h2>
+<p>Replace <code>getRecurIndex</code> with <code>getRecurTarget</code>:</p>
+<ol>
+  <li>If <code>recur</code> arg is <code>Var(v)</code>, resolve exactly as today, target length = 1.</li>
+  <li>If <code>recur</code> arg is <code>TupleCons(items)</code>, each item must be <code>Var(v)</code> and map to a distinct def parameter position.</li>
+  <li>Otherwise reject.</li>
+</ol>
+<p>Conservative constraints:</p>
+<ol>
+  <li>No duplicates in tuple target.</li>
+  <li>Every tuple element must resolve to a top-level parameter binding (not a local, not an expression).</li>
+</ol>
+<h2><a href="#branch-analysis" name="branch-analysis" class="anchor"><span class="anchor-link"></span></a>Branch analysis</h2>
+<p>For each branch pattern:</p>
+<ol>
+  <li>Single target: keep existing behavior (<code>pat.substructures</code>).</li>
+  <li>Tuple target of arity <code>k</code>:</li>
+  <li>If branch pattern is a tuple pattern with arity <code>k</code>, compute component-wise:  <code>allowedPerComponent(i) = componentPattern(i).substructures.toSet</code>.</li>
+  <li>
+  <p>Otherwise, set all components to empty sets (no provable decrease in this branch).</p></li>
+</ol>
+<p>This is conservative and sound.</p>
+<h2><a href="#recursive-call-check" name="recursive-call-check" class="anchor"><span class="anchor-link"></span></a>Recursive call check</h2>
+<p>For a recursive call to function <code>f</code> in <code>InRecurBranch</code>:</p>
+<ol>
+  <li>Extract call argument at each target position (existing <code>argsOnDefName</code> + indexing by group/index).</li>
+  <li>For each component <code>i</code>, classify call arg as:</li>
+  <li><code>Equal</code> if arg is exactly <code>Var(paramName_i)</code>.</li>
+  <li><code>Decreases</code> if arg is <code>Var(name)</code> and <code>name ∈ allowedPerComponent(i)</code>.</li>
+  <li><code>Other</code> otherwise.</li>
+  <li>Accept iff some <code>i</code> satisfies:</li>
+  <li><code>class(i) == Decreases</code>, and</li>
+  <li>all earlier classes are <code>Equal</code>.</li>
+  <li>Reject otherwise.</li>
+</ol>
+<p>Important soundness detail: After validating the outer recursive call, still recurse into all call arguments with <code>checkDecl</code> so nested recursive calls are checked too.</p>
+<p>This is required for expressions like: <code>ack(n_prev, ack(n, m_prev))</code> where the inner recursive call must independently satisfy lexicographic descent.</p>
+<h2><a href="#error-model" name="error-model" class="anchor"><span class="anchor-link"></span></a>Error model</h2>
+<p>Existing errors stay, but tuple-lexicographic mode needs new diagnostics.</p>
+<h3><a href="#new-errors" name="new-errors" class="anchor"><span class="anchor-link"></span></a>New errors</h3>
+<ol>
+  <li>
+  <p><code>RecurTargetInvalid</code> Message: <code>recur target must be a name or tuple of names bound to function parameters.</code> Use when target contains non-vars, locals, or non-parameter names.</p></li>
+  <li>
+  <p><code>RecurTargetDuplicate</code> Message: <code>recur target contains duplicate parameter &lt;name&gt;; each target component must be distinct.</code> Use when tuple target repeats a parameter.</p></li>
+  <li>
+  <p><code>RecursionNotLexicographic</code> Message: <code>recursive call to &lt;fn&gt; is not lexicographically smaller on recur target (&lt;t0, ...&gt;).</code> <code>Expected: some component decreases and all earlier components are unchanged.</code> Use when call arguments fail the lexicographic predicate.</p></li>
+</ol>
+<h3><a href="#existing-errors-reused" name="existing-errors-reused" class="anchor"><span class="anchor-link"></span></a>Existing errors reused</h3>
+<ol>
+  <li><code>NotEnoughRecurArgs</code> still applies if call does not supply enough args to inspect target positions.</li>
+  <li><code>InvalidRecursion</code>, <code>UnexpectedRecur</code>, <code>IllegalShadow</code>, <code>RecursiveDefNoRecur</code> unchanged.</li>
+  <li><code>RecursionArgNotVar</code>/<code>RecursionNotSubstructural</code> become effectively superseded for tuple mode; they can remain for single-target compatibility or be folded into <code>RecursionNotLexicographic</code>.</li>
+</ol>
+<h2><a href="#examples" name="examples" class="anchor"><span class="anchor-link"></span></a>Examples</h2>
+<p>Accepted:</p>
+<ol>
+  <li><code>ack(n_prev, Succ(Zero))</code> in branch <code>(Succ(n_prev), Zero)</code> (decrease in component 0).</li>
+  <li><code>ack(n, m_prev)</code> in branch <code>(Succ(n_prev), Succ(m_prev))</code> (component 0 equal, component 1 decreases).</li>
+  <li><code>ack(n_prev, ack(n, m_prev))</code> because:</li>
+  <li>outer call decreases component 0;</li>
+  <li>inner call decreases component 1 with component 0 equal.</li>
+</ol>
+<p>Rejected:</p>
+<ol>
+  <li><code>ack(n, Succ(m))</code> in branch <code>(Succ(n_prev), Succ(m_prev))</code> (no component proven to decrease).</li>
+  <li>Calls that decrease component 1 while component 0 is changed to a non-equal non-decreasing value.</li>
+</ol>
+<h2><a href="#test-plan" name="test-plan" class="anchor"><span class="anchor-link"></span></a>Test plan</h2>
+<p>Update <code>core/src/test/scala/dev/bosatsu/DefRecursionCheckTest.scala</code> with:</p>
+<ol>
+  <li>Positive: direct two-arg Ackermann form with <code>recur (n, m)</code>.</li>
+  <li>Positive: branch where earlier component decreases and later increases.</li>
+  <li>Positive: nested recursive call in later argument (<code>ack(n_prev, ack(n, m_prev))</code>).</li>
+  <li>Negative: classic non-terminating &ldquo;alternate decreases&rdquo; counterexample.</li>
+  <li>Negative: invalid <code>recur</code> tuple target elements (non-var/non-parameter/local).</li>
+  <li>Negative: duplicate tuple target names.</li>
+  <li>Negative: recursive call that is not lexicographically smaller.</li>
+  <li>Regression: existing single-argument recursion cases remain unchanged.</li>
+</ol>
+<h2><a href="#impact-outside-recursion-checker" name="impact-outside-recursion-checker" class="anchor"><span class="anchor-link"></span></a>Impact outside recursion checker</h2>
+<p>Required:</p>
+<ol>
+  <li>Tests in <code>DefRecursionCheckTest</code>.</li>
+  <li>User docs (<code>docs/src/main/paradox/recursion.md</code>, and possibly <code>language_guide.md</code>) to document tuple <code>recur</code> + lexicographic rule.</li>
+</ol>
+<p>Not required:</p>
+<ol>
+  <li>Parser/AST shape changes: <code>recur</code> arg already accepts general expressions including tuples.</li>
+  <li>Type inference, totality checker, Matchless lowering, or codegen changes.</li>
+  <li><code>PackageError</code> plumbing changes (new <code>RecursionError</code> cases flow through existing wrapper).</li>
+</ol>
+<h2><a href="#complexity-and-performance" name="complexity-and-performance" class="anchor"><span class="anchor-link"></span></a>Complexity and performance</h2>
+<ol>
+  <li>Per recursive call check becomes <code>O(k)</code> for <code>k</code> target components (typically small).</li>
+  <li>Traversing all call arguments in recursive-call cases matches existing behavior for non-recursive calls and is linear in argument AST size.</li>
+</ol>
+<h2><a href="#open-implementation-choices" name="open-implementation-choices" class="anchor"><span class="anchor-link"></span></a>Open implementation choices</h2>
+<ol>
+  <li>Keep <code>RecursionArgNotVar</code> + <code>RecursionNotSubstructural</code> for single-target path, or replace with unified <code>RecursionNotLexicographic</code>.</li>
+  <li>Whether to allow <code>recur (x)</code> as equivalent to <code>recur x</code> (recommended: yes, for consistency).</li>
+  <li>Diagnostic detail level: include per-component classification (<code>Equal/Decreases/Other</code>) in error text for debugging.</li>
+</ol>
+<div class="source-github">
+The source code for this page can be found <a href="https://github.com/johnynek/bosatsu/tree/master/docs/src/main/paradox/design-docs/lexicographic_recur_design.md">here</a>.
+</div>
+
+<div class="nav-next">
+<p><strong>Next:</strong> <a href="../getting_started.html">Getting started (new repo)</a></p>
+</div>
+</div>
+<div class="large-3 show-for-large column" data-sticky-container>
+<nav class="sidebar sticky" data-sticky data-anchor="docs" data-sticky-on="large">
+<div class="page-nav">
+<div class="nav-title">On this page:</div>
+<div class="nav-toc">
+<ul>
+  <li><a href="../design-docs/lexicographic_recur_design.html#lexicographic-recur-tuple-design" class="header">Lexicographic <code>recur</code> Tuple Design</a></li>
+</ul>
+</div>
+</div>
+</nav>
+</div>
+</div>
+
+</section>
+</div>
+
+</div>
+
+<footer class="site-footer">
+
+<section class="site-footer-nav">
+<div class="expanded row">
+<div class="small-12 large-offset-2 large-10 column">
+<div class="row site-footer-content">
+
+<div class="small-12 medium-4 large-3 text-center column">
+<div class="nav-links">
+<ul>
+<!-- <li><a href="https://www.example.com/products/">Products</a> -->
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</section>
+
+<section class="site-footer-base">
+<div class="expanded row">
+<div class="small-12 large-offset-2 large-10 column">
+<div class="row site-footer-content">
+
+<div class="small-12 text-center large-9 column">
+
+<!--
+<div class="copyright">
+<span class="text">&copy; 2026</span>
+<a href="https://www.example.com" class="logo">logo</a>
+</div>
+-->
+</div>
+
+</div>
+</div>
+</div>
+</section>
+</footer>
+
+</div>
+</div>
+</div>
+</body>
+
+<script type="text/javascript" src="../lib/foundation/dist/foundation.min.js"></script>
+<script type="text/javascript">jQuery(document).foundation();</script>
+<script type="text/javascript" src="../js/magellan.js"></script>
+
+<style type="text/css">@import "../lib/prettify/prettify.css";</style>
+<script type="text/javascript" src="../lib/prettify/prettify.js"></script>
+<script type="text/javascript" src="../lib/prettify/lang-scala.js"></script>
+<script type="text/javascript">jQuery(function(){window.prettyPrint && prettyPrint()});</script>
+<script type="text/javascript">jQuery(function(jq){initOldVersionWarnings(jq, '0.0.0+1-b32eeaff-SNAPSHOT', 'https://github.com/johnynek/bosatsu')});</script>
+
+
+</html>

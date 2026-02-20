@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+
+<head>
+<title>Issue 1718: Instantiate/Pushdown Unification Plan · Bosatsu Documentation</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="description" content='paradox docs'/>
+<link rel="canonical" href="https://github.com/johnynek/bosatsudesign-docs/issue_1718_instantiate_pushdown_unification_plan.html"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:100normal,100italic,300normal,300italic,400normal,400italic,500normal,500italic,700normal,700italic,900normal,900italicc" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="../lib/jquery/jquery.min.js"></script>
+<script type="text/javascript" src="../js/page.js"></script>
+<script type="text/javascript" src="../js/warnOldVersion.js"></script>
+<script type="text/javascript" src="../js/groups.js"></script>
+<script type="text/javascript" src="../js/snippets.js"></script>
+<link rel="stylesheet" type="text/css" href="../lib/foundation/dist/foundation.min.css"/>
+<link rel="stylesheet" type="text/css" href="../css/page.css"/>
+
+<!--
+<link rel="shortcut icon" href="../images/favicon.ico" />
+-->
+</head>
+
+<body>
+<div class="off-canvas-wrapper">
+<div class="off-canvas-wrapper-inner" data-off-canvas-wrapper>
+
+<div class="off-canvas position-left" id="off-canvas-menu" data-off-canvas>
+<nav class="off-canvas-nav">
+<div class="nav-home">
+<a href="../index.html" >
+<span class="home-icon">⌂</span>Bosatsu Documentation
+</a>
+<div class="version-number">
+0.0.0+1-b32eeaff*
+</div>
+</div>
+<div class="nav-toc">
+<ul>
+  <li><a href="../design.html" class="page">Bosatsu Design Philosophy and Goals</a></li>
+  <li><a href="../design-docs/index.html" class="page">Design Docs</a></li>
+  <li><a href="../getting_started.html" class="page">Getting started (new repo)</a></li>
+  <li><a href="../language_guide.html" class="page">Language Guide</a></li>
+  <li><a href="../recursion.html" class="page">Recursion in Bosatsu</a></li>
+  <li><a href="../generating_json.html" class="page">Generating JSON from Bosatsu Values</a></li>
+  <li><a href="../debugging_with_eval.html" class="page">Debugging with <code>lib eval</code></a></li>
+  <li><a href="../debugging_with_show.html" class="page">Inspecting Compiled Output with <code>lib show</code></a></li>
+  <li><a href="../transpile_python.html" class="page">Compiling to Python</a></li>
+  <li><a href="../generated/core_alpha/index.html" class="page">Core Alpha API</a></li>
+</ul>
+</div>
+
+</nav>
+</div>
+
+<div class="off-canvas-content" data-off-canvas-content>
+
+<header class="site-header expanded row">
+<div class="small-12 column">
+<a href="#" class="off-canvas-toggle hide-for-medium" data-toggle="off-canvas-menu"><svg class="svg-icon svg-icon-menu" version="1.1" id="Menu" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 20 20" enable-background="new 0 0 20 20" xml:space="preserve"> <path class="svg-icon-menu-path" fill="#53CDEC" d="M16.4,9H3.6C3.048,9,3,9.447,3,10c0,0.553,0.048,1,0.6,1H16.4c0.552,0,0.6-0.447,0.6-1C17,9.447,16.952,9,16.4,9z M16.4,13
+H3.6C3.048,13,3,13.447,3,14c0,0.553,0.048,1,0.6,1H16.4c0.552,0,0.6-0.447,0.6-1C17,13.447,16.952,13,16.4,13z M3.6,7H16.4
+C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.048,7,3.6,7z"/></svg>
+</a>
+<div class="title"><a href="../index.html">Bosatsu Documentation</a></div>
+
+<!--
+<a href="https://www.example.com" class="logo show-for-medium">logo</a>
+-->
+</div>
+</header>
+
+<div class="expanded row">
+
+<div class="medium-3 large-2 show-for-medium column">
+<nav class="site-nav">
+<div class="nav-home">
+<a href="../index.html" >
+<span class="home-icon">⌂</span>Bosatsu Documentation
+</a>
+<div class="version-number">
+0.0.0+1-b32eeaff*
+</div>
+</div>
+<div class="nav-toc">
+<ul>
+  <li><a href="../design.html" class="page">Bosatsu Design Philosophy and Goals</a></li>
+  <li><a href="../design-docs/index.html" class="page">Design Docs</a></li>
+  <li><a href="../getting_started.html" class="page">Getting started (new repo)</a></li>
+  <li><a href="../language_guide.html" class="page">Language Guide</a></li>
+  <li><a href="../recursion.html" class="page">Recursion in Bosatsu</a></li>
+  <li><a href="../generating_json.html" class="page">Generating JSON from Bosatsu Values</a></li>
+  <li><a href="../debugging_with_eval.html" class="page">Debugging with <code>lib eval</code></a></li>
+  <li><a href="../debugging_with_show.html" class="page">Inspecting Compiled Output with <code>lib show</code></a></li>
+  <li><a href="../transpile_python.html" class="page">Compiling to Python</a></li>
+  <li><a href="../generated/core_alpha/index.html" class="page">Core Alpha API</a></li>
+</ul>
+</div>
+
+</nav>
+</div>
+
+<div class="small-12 medium-9 large-10 column">
+<section class="site-content">
+
+<span id="version-warning"></span>
+
+<div class="page-header row">
+<div class="medium-12 show-for-medium column">
+<div class="nav-breadcrumbs">
+<ul>
+  <li><a href="../index.html">Bosatsu Documentation</a></li>
+  <li><a href="../design-docs/index.html">Design Docs</a></li>
+  <li>Issue 1718: Instantiate/Pushdown Unification Plan</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div class="page-content row">
+<div class="small-12 large-9 column" id="docs">
+<h1><a href="#issue-1718-instantiate-pushdown-unification-plan" name="issue-1718-instantiate-pushdown-unification-plan" class="anchor"><span class="anchor-link"></span></a>Issue 1718: Instantiate/Pushdown Unification Plan</h1>
+<h2><a href="#context" name="context" class="anchor"><span class="anchor-link"></span></a>Context</h2>
+<p>Issue <a href="https://github.com/johnynek/bosatsu/issues/1718">#1718</a> calls out two duplication points:</p>
+<ol>
+  <li><code>TypedExpr.instantiateTo</code> vs <code>Type.instantiate</code>.</li>
+  <li><code>pushDownCovariant</code> in both <code>Infer.instDataCon</code> and <code>TypedExpr.instantiateTo</code>.</li>
+</ol>
+<p>The objective is the smallest refactor that reduces duplication while preserving:</p>
+<ol>
+  <li>existing typechecking behavior,</li>
+  <li>instantiation evidence,</li>
+  <li>soundness (no widen-only shortcuts where evidence exists).</li>
+</ol>
+<p>This document is an implementation and testing plan only (no <code>src/main</code> changes in this PR).</p>
+<h2><a href="#current-behavior-snapshot" name="current-behavior-snapshot" class="anchor"><span class="anchor-link"></span></a>Current Behavior Snapshot</h2>
+<h3><a href="#instantiation-paths-today" name="instantiation-paths-today" class="anchor"><span class="anchor-link"></span></a>Instantiation paths today</h3>
+<ol>
+  <li><code>Type.instantiate</code>:</li>
+  <li>structural matcher with explicit left vars, right existentials, and right-side env scope.</li>
+  <li>returns <code>Type.Instantiation(frees, subs, toFrees, toSubs)</code>.</li>
+  <li>used in inference codepaths that can validate kind-correct substitutions.</li>
+  <li>
+  <p><code>TypedExpr.instantiateTo</code>:</p></li>
+  <li>local solver for <code>Generic</code> expression specialization to <code>Rho</code>.</li>
+  <li>contains local pushdown retry logic and expression-level wrapping/fallback.</li>
+  <li>falls back to annotation when it cannot solve.</li>
+</ol>
+<h3><a href="#pattern-pushdown-today" name="pattern-pushdown-today" class="anchor"><span class="anchor-link"></span></a>Pattern pushdown today</h3>
+<ol>
+  <li><code>Infer.instDataCon</code> has local <code>pushDownCovariant</code> to handle constructor-pattern sigma with <code>forall</code>.</li>
+  <li><code>TypedExpr</code> has a similar local <code>pushDownCovariant</code> used by <code>instantiateTo</code>.</li>
+</ol>
+<p>These are conceptually the same transform but implemented twice with slightly different shape.</p>
+<h2><a href="#coverage-baseline-before-this-pr-" name="coverage-baseline-before-this-pr-" class="anchor"><span class="anchor-link"></span></a>Coverage Baseline (Before This PR)</h2>
+<p>From <code>sbt &#39;;clean;set ThisBuild / coverageEnabled := true;coreJVM/test;cli/test;coreJVM/coverageReport;cli/coverageReport&#39;</code> on February 19, 2026:</p>
+<ol>
+  <li><code>coreJVM</code>: statement <code>84.28%</code>, branch <code>81.50%</code>.</li>
+  <li><code>cli</code>: statement <code>48.29%</code>, branch <code>39.53%</code>.</li>
+</ol>
+<p>Relevant uncovered branches in <code>Infer</code>:</p>
+<ol>
+  <li><code>typeCheckPattern</code> list-pattern <code>forall List</code> fast-path (<code>Infer.scala:2661</code>, <code>Infer.scala:2663</code>).</li>
+  <li><code>instDataCon</code> local <code>pushDownCovariant</code> branches that re-wrap recursive <code>ForAll</code> results (<code>Infer.scala:2875</code>, <code>Infer.scala:2877</code>, <code>Infer.scala:2890</code>, <code>Infer.scala:2891</code>).</li>
+</ol>
+<p><code>TypedExpr.instantiateTo</code> and <code>Type.instantiate</code> are already at 100% method coverage, but call-site behavior still benefits from regression tests.</p>
+<h2><a href="#tests-added-in-this-pr" name="tests-added-in-this-pr" class="anchor"><span class="anchor-link"></span></a>Tests Added In This PR</h2>
+<p>Added to <code>RankNInferTest</code>:</p>
+<ol>
+  <li><code>list patterns can consume forall-list scrutinees</code>:</li>
+  <li>targets <code>typeCheckPattern</code> <code>forall List</code> specialization fast-path.</li>
+  <li>
+  <p><code>pattern instantiation pushes forall through mixed-variance constructor args</code>:</p></li>
+  <li>targets <code>instDataCon.pushDownCovariant</code> recursive <code>ForAll</code> wrapping branches.</li>
+  <li>
+  <p><code>polymorphic match result can be instantiated at higher-order call sites</code>:</p></li>
+  <li>regression on polymorphic match results specialized at use sites (instantiate/coerce call graph behavior).</li>
+</ol>
+<h2><a href="#refactor-plan-issue-1718-" name="refactor-plan-issue-1718-" class="anchor"><span class="anchor-link"></span></a>Refactor Plan (Issue 1718)</h2>
+<h3><a href="#phase-1-unify-covariant-pushdown" name="phase-1-unify-covariant-pushdown" class="anchor"><span class="anchor-link"></span></a>Phase 1: Unify covariant pushdown</h3>
+<ol>
+  <li>Extract a shared type-level helper in <code>Type</code> (or closely related rankn module):</li>
+  <li>input: quantifier-bearing type plus a variance/kind lookup for applied heads.</li>
+  <li>output: transformed type with <code>forall</code> pushed through covariant positions conservatively.</li>
+  <li>
+  <p>Replace both current call sites with thin wrappers:</p></li>
+  <li><code>Infer.instDataCon</code> wrapper only supplies constructor arg variance/kind context.</li>
+  <li><code>TypedExpr.instantiateTo</code> wrapper supplies resolver from available kinds map.</li>
+  <li>
+  <p>Keep behavior conservative:</p></li>
+  <li>if variance info is missing, return input unchanged.</li>
+  <li>do not invent substitutions or quantifier elimination not already allowed.</li>
+</ol>
+<h3><a href="#phase-2-delegate-typedexpr-instantiateto-to-type-instantiate" name="phase-2-delegate-typedexpr-instantiateto-to-type-instantiate" class="anchor"><span class="anchor-link"></span></a>Phase 2: Delegate <code>TypedExpr.instantiateTo</code> to <code>Type.instantiate</code></h3>
+<ol>
+  <li>Rework <code>TypedExpr.instantiateTo</code> as orchestration only:</li>
+  <li>pre-step: split quantifiers from <code>gen.quantType</code>.</li>
+  <li>solver step: call <code>Type.instantiate</code>.</li>
+  <li>post-step: substitute expression types using returned <code>subs</code>.</li>
+  <li>quantifier rewrapping/pushGeneric/fallback remains local to <code>TypedExpr</code>.</li>
+  <li>
+  <p>Preserve evidence:</p></li>
+  <li>use <code>Instantiation.subs</code> as the primary witness for specialization.</li>
+  <li>preserve unsolved frees by rebuilding <code>Generic</code> wrappers when possible.</li>
+  <li>only use annotation fallback when solver cannot provide a coherent witness.</li>
+  <li>
+  <p>Keep existing fallback semantics:</p></li>
+  <li>if solve fails, keep <code>ann(gen, instTpe)</code> behavior.</li>
+  <li>avoid replacing evidence-driven coercions with widen-only coercions.</li>
+</ol>
+<h3><a href="#phase-3-clean-call-graph-and-reduce-duplication" name="phase-3-clean-call-graph-and-reduce-duplication" class="anchor"><span class="anchor-link"></span></a>Phase 3: Clean call graph and reduce duplication</h3>
+<ol>
+  <li>Remove duplicated local solver code once all tests pass.</li>
+  <li>Remove duplicated local pushdown implementation.</li>
+  <li>Keep helper APIs small:</li>
+  <li>one shared pushdown helper,</li>
+  <li>one shared instantiate solver (<code>Type.instantiate</code>) consumed by both inference and typed-expression coercion.</li>
+</ol>
+<h2><a href="#testing-plan-for-refactor" name="testing-plan-for-refactor" class="anchor"><span class="anchor-link"></span></a>Testing Plan For Refactor</h2>
+<h3><a href="#required-gates" name="required-gates" class="anchor"><span class="anchor-link"></span></a>Required gates</h3>
+<ol>
+  <li>existing <code>coreJVM/test</code> and <code>cli/test</code> must remain green.</li>
+  <li>targeted coverage for issue-relevant methods must be 100% statement/branch:</li>
+  <li><code>Type.instantiate</code>,</li>
+  <li><code>TypedExpr.instantiateTo</code>,</li>
+  <li>shared pushdown helper (new),</li>
+  <li><code>Infer.typeCheckPattern</code> list <code>forall List</code> branch,</li>
+  <li>constructor-pattern pushdown branches previously uncovered.</li>
+</ol>
+<h3><a href="#additional-regression-matrix" name="additional-regression-matrix" class="anchor"><span class="anchor-link"></span></a>Additional regression matrix</h3>
+<ol>
+  <li>pattern checks with:</li>
+  <li>mixed variance constructors,</li>
+  <li><code>forall</code> scrutinee types,</li>
+  <li>list patterns under <code>forall</code>.</li>
+  <li>
+  <p>specialization/coercion with:</p></li>
+  <li>polymorphic match branches,</li>
+  <li>higher-order call sites expecting monomorphic function types,</li>
+  <li>existential-heavy argument/application paths where apply fallback currently exists.</li>
+  <li>
+  <p>soundness checks:</p></li>
+  <li>keep existing ill-typed programs ill-typed (especially unsound variance/existential cases),</li>
+  <li>ensure no new widening-only acceptance appears where evidence should be required.</li>
+</ol>
+<h2><a href="#minimal-change-sequencing" name="minimal-change-sequencing" class="anchor"><span class="anchor-link"></span></a>Minimal-Change Sequencing</h2>
+<ol>
+  <li>land shared pushdown helper + call-site rewires first (no instantiate unification yet).</li>
+  <li>land <code>instantiateTo</code> delegation to <code>Type.instantiate</code> second.</li>
+  <li>remove dead duplicated code last.</li>
+  <li>after each step: run focused test subset + full <code>coreJVM/test</code>.</li>
+</ol>
+<p>This order minimizes blast radius while keeping bisectable behavioral changes.</p>
+<div class="source-github">
+The source code for this page can be found <a href="https://github.com/johnynek/bosatsu/tree/master/docs/src/main/paradox/design-docs/issue_1718_instantiate_pushdown_unification_plan.md">here</a>.
+</div>
+
+<div class="nav-next">
+<p><strong>Next:</strong> <a href="../design-docs/issue_1732_match_site_struct_scrutinee_elision_design.html">Issue 1732: Match-Site Struct/Tuple Scrutinee Elision in <code>Matchless</code></a></p>
+</div>
+</div>
+<div class="large-3 show-for-large column" data-sticky-container>
+<nav class="sidebar sticky" data-sticky data-anchor="docs" data-sticky-on="large">
+<div class="page-nav">
+<div class="nav-title">On this page:</div>
+<div class="nav-toc">
+<ul>
+  <li><a href="../design-docs/issue_1718_instantiate_pushdown_unification_plan.html#issue-1718-instantiate-pushdown-unification-plan" class="header">Issue 1718: Instantiate/Pushdown Unification Plan</a></li>
+</ul>
+</div>
+</div>
+</nav>
+</div>
+</div>
+
+</section>
+</div>
+
+</div>
+
+<footer class="site-footer">
+
+<section class="site-footer-nav">
+<div class="expanded row">
+<div class="small-12 large-offset-2 large-10 column">
+<div class="row site-footer-content">
+
+<div class="small-12 medium-4 large-3 text-center column">
+<div class="nav-links">
+<ul>
+<!-- <li><a href="https://www.example.com/products/">Products</a> -->
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</section>
+
+<section class="site-footer-base">
+<div class="expanded row">
+<div class="small-12 large-offset-2 large-10 column">
+<div class="row site-footer-content">
+
+<div class="small-12 text-center large-9 column">
+
+<!--
+<div class="copyright">
+<span class="text">&copy; 2026</span>
+<a href="https://www.example.com" class="logo">logo</a>
+</div>
+-->
+</div>
+
+</div>
+</div>
+</div>
+</section>
+</footer>
+
+</div>
+</div>
+</div>
+</body>
+
+<script type="text/javascript" src="../lib/foundation/dist/foundation.min.js"></script>
+<script type="text/javascript">jQuery(document).foundation();</script>
+<script type="text/javascript" src="../js/magellan.js"></script>
+
+<style type="text/css">@import "../lib/prettify/prettify.css";</style>
+<script type="text/javascript" src="../lib/prettify/prettify.js"></script>
+<script type="text/javascript" src="../lib/prettify/lang-scala.js"></script>
+<script type="text/javascript">jQuery(function(){window.prettyPrint && prettyPrint()});</script>
+<script type="text/javascript">jQuery(function(jq){initOldVersionWarnings(jq, '0.0.0+1-b32eeaff-SNAPSHOT', 'https://github.com/johnynek/bosatsu')});</script>
+
+
+</html>
