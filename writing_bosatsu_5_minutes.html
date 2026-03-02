@@ -2,11 +2,11 @@
 <html class="no-js" lang="en">
 
 <head>
-<title>Bosatsu Documentation</title>
+<title>Writing Bosatsu in 5 minutes · Bosatsu Documentation</title>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="description" content='paradox docs'/>
-<link rel="canonical" href="https://github.com/johnynek/bosatsuindex.html"/>
+<link rel="canonical" href="https://github.com/johnynek/bosatsuwriting_bosatsu_5_minutes.html"/>
 <link href="https://fonts.googleapis.com/css?family=Roboto:100normal,100italic,300normal,300italic,400normal,400italic,500normal,500italic,700normal,700italic,900normal,900italicc" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="lib/jquery/jquery.min.js"></script>
 <script type="text/javascript" src="js/page.js"></script>
@@ -28,7 +28,7 @@
 <div class="off-canvas position-left" id="off-canvas-menu" data-off-canvas>
 <nav class="off-canvas-nav">
 <div class="nav-home">
-<a href="index.html" class="active">
+<a href="index.html" >
 <span class="home-icon">⌂</span>Bosatsu Documentation
 </a>
 <div class="version-number">
@@ -40,7 +40,7 @@
   <li><a href="design.html" class="page">Bosatsu Design Philosophy and Goals</a></li>
   <li><a href="design-docs/index.html" class="page">Design Docs</a></li>
   <li><a href="getting_started.html" class="page">Getting started (new repo)</a></li>
-  <li><a href="writing_bosatsu_5_minutes.html" class="page">Writing Bosatsu in 5 minutes</a></li>
+  <li><a href="writing_bosatsu_5_minutes.html" class="active page">Writing Bosatsu in 5 minutes</a></li>
   <li><a href="language_guide.html" class="page">Language Guide</a></li>
   <li><a href="recursion.html" class="page">Recursion in Bosatsu</a></li>
   <li><a href="generating_json.html" class="page">Generating JSON from Bosatsu Values</a></li>
@@ -62,7 +62,7 @@
 H3.6C3.048,13,3,13.447,3,14c0,0.553,0.048,1,0.6,1H16.4c0.552,0,0.6-0.447,0.6-1C17,13.447,16.952,13,16.4,13z M3.6,7H16.4
 C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.048,7,3.6,7z"/></svg>
 </a>
-<div class="title"><a href="index.html" class="active">Bosatsu Documentation</a></div>
+<div class="title"><a href="index.html">Bosatsu Documentation</a></div>
 
 <!--
 <a href="https://www.example.com" class="logo show-for-medium">logo</a>
@@ -75,7 +75,7 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 <div class="medium-3 large-2 show-for-medium column">
 <nav class="site-nav">
 <div class="nav-home">
-<a href="index.html" class="active">
+<a href="index.html" >
 <span class="home-icon">⌂</span>Bosatsu Documentation
 </a>
 <div class="version-number">
@@ -87,7 +87,7 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
   <li><a href="design.html" class="page">Bosatsu Design Philosophy and Goals</a></li>
   <li><a href="design-docs/index.html" class="page">Design Docs</a></li>
   <li><a href="getting_started.html" class="page">Getting started (new repo)</a></li>
-  <li><a href="writing_bosatsu_5_minutes.html" class="page">Writing Bosatsu in 5 minutes</a></li>
+  <li><a href="writing_bosatsu_5_minutes.html" class="active page">Writing Bosatsu in 5 minutes</a></li>
   <li><a href="language_guide.html" class="page">Language Guide</a></li>
   <li><a href="recursion.html" class="page">Recursion in Bosatsu</a></li>
   <li><a href="generating_json.html" class="page">Generating JSON from Bosatsu Values</a></li>
@@ -108,65 +108,112 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 
 <div class="page-header row">
 <div class="medium-12 show-for-medium column">
+<div class="nav-breadcrumbs">
+<ul>
+  <li><a href="index.html">Bosatsu Documentation</a></li>
+  <li>Writing Bosatsu in 5 minutes</li>
+</ul>
+</div>
 </div>
 </div>
 
 <div class="page-content row">
 <div class="small-12 large-9 column" id="docs">
-<h1><a href="#bosatsu-documentation" name="bosatsu-documentation" class="anchor"><span class="anchor-link"></span></a>Bosatsu Documentation</h1>
-<p>Bosatsu (菩薩) is the transliteration in Japanese of the sanskrit bodhisattva. A bodhisattva is someone who can reach enlightenment but decides not to, to help others achieve that goal. &ndash; Wikipedia</p>
-<p>Bosatsu is a simple, non-turing complete language designed for configuration, queries and scripting. It borrows from <a href="https://www.python.org/">Python</a>, <a href="https://www.haskell.org/">Haskell</a>, <a href="https://hackage.haskell.org/package/dhall">Dhall</a> and <a href="https://www.rust-lang.org/en-US/">Rust</a>.</p>
-<p>Here is a working Bosatsu program to solve the first <a href="https://projecteuler.net/">Project Euler</a> problem:</p>
-<pre><code>package Euler/One
+<h1><a href="#writing-bosatsu-in-5-minutes" name="writing-bosatsu-in-5-minutes" class="anchor"><span class="anchor-link"></span></a>Writing Bosatsu in 5 minutes</h1>
+<p>This page is for programmers who already know Python and immutable functional programming (Haskell/Scala style), and want the shortest path to writing useful Bosatsu.</p>
+<p>If you need repo/bootstrap setup first, see <a href="getting_started.html">Getting started</a>. For full syntax details, see the <a href="language_guide.html">Language guide</a>.</p>
+<h2><a href="#1-minimal-file-shape" name="1-minimal-file-shape" class="anchor"><span class="anchor-link"></span></a>1) Minimal file shape</h2>
+<pre class="prettyprint"><code class="language-bosatsu">package Quick/Hello
 
-# see:
-# https://projecteuler.net/problem=1
-# Find the sum of all the multiples of 3 or 5 below 1000.
+export (Mood(), greet, tests)
 
-operator == = eq_Int
-operator % = mod_Int
+enum Mood: Happy, Sad
 
-def operator ||(x, y):
-  True if x else y
+def greet(m: Mood) -&gt; String:
+  match m:
+    case Happy: &quot;hello&quot;
+    case Sad: &quot;cheer up&quot;
 
-def keep(i):
-  (i % 3 == 0) || (i % 5 == 0)
-
-def sum(as): as.foldl_List(0, add)
-
-# here is the python version:
-# &gt;&gt;&gt; sum(i for i in xrange(1000) if keep(i))
-# 233168
-#
-# bosatsu version here
-computed = sum([i for i in range(1000) if keep(i)])
-
-test = Assertion(computed == 233168, &quot;expected 233168&quot;)
+tests = TestSuite(&quot;hello tests&quot;, [
+  Assertion(greet(Happy) matches &quot;hello&quot;, &quot;happy greeting&quot;),
+])
 </code></pre>
-<p>Bosatsu is a new language with the following main features:</p>
+<p>Top-order bits:</p>
 <ol>
-  <li>a highly Python-inspired syntax including function definition, literal integers and strings, literal lists, list comprehensions, tuples and (string key) dictionaries. Generally, if a syntax is possible to support in the current type system with immutable values, we generally intend to support it.</li>
-  <li>powerful pattern matching</li>
-  <li>A static type system using a generalization of <a href="https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system">Hindley-Milner (or Damas-Milner)</a> published in <a href="https://www.microsoft.com/en-us/research/publication/practical-type-inference-for-arbitrary-rank-types/">this paper by Simon Peyton Jones et. al.</a></li>
-  <li>data classes or named tuples, which we call structs following Rust</li>
-  <li>sum types, which we call enums following Rust.</li>
-  <li>a package system with explicit import and export syntax.</li>
+  <li>Every file starts with exactly one <code>package</code>.</li>
+  <li>Imports and exports are explicit.</li>
+  <li><code>enum</code>/<code>struct</code> replace class + inheritance style modeling.</li>
+  <li><code>match</code> is the normal way to branch on data shape.</li>
+  <li>Tests are regular values (<code>Assertion</code>, <code>TestSuite</code>).</li>
 </ol>
-<p>There are also some un-features, or items we don&rsquo;t currently and may never support</p>
+<h2><a href="#2-python-to-bosatsu-quick-mental-map" name="2-python-to-bosatsu-quick-mental-map" class="anchor"><span class="anchor-link"></span></a>2) Python to Bosatsu: quick mental map</h2>
 <ol>
-  <li>There is very limited recursion. We only allow recursion which can never be used to make an  infinite loop.</li>
-  <li>Data structures can only be recursive in covariant positions (not the  arguments of functions), and recursive functions have to be a certain form that will always  terminate</li>
-  <li>There is no <code>while</code> syntax. The closest we have are tail-recursive functions which recurse on sub-values of the inputs. There is a design sketch of automatically translating for loops on lists into folds <a href="https://github.com/johnynek/bosatsu/issues/20">issue 20</a>.</li>
+  <li>Everything is immutable. You can shadow names, but not mutate values.</li>
+  <li>Blocks are expressions: the last line is the return value.</li>
+  <li>No <code>while</code>/mutation loops; use <code>recur</code>, <code>int_loop</code>, folds, or comprehensions.</li>
+  <li>No exceptions as control flow in normal code. Model errors in types.</li>
+  <li>Side effects are explicit <code>Prog[...]</code> values, not implicit execution.</li>
 </ol>
+<p>If you are writing I/O code, expect this style:</p>
+<pre class="prettyprint"><code class="language-bosatsu">main = (
+  _ &lt;- println(&quot;hello&quot;).await()
+  pure(0)
+)
+</code></pre>
+<p><code>&lt;-</code> with <code>.await()</code> is the common way to sequence <code>Prog</code> values.</p>
+<h2><a href="#3-recurring-tricks-from-test-workspace" name="3-recurring-tricks-from-test-workspace" class="anchor"><span class="anchor-link"></span></a>3) Recurring tricks from <code>test_workspace</code></h2>
+<ol>
+  <li>Prefer <code>match</code> + pattern guards (<code>if ...</code>) for branching.</li>
+  <li>Use list patterns heavily: <code>[]</code>, <code>[head, *tail]</code>.</li>
+  <li>Write local helper loops with accumulators for performance and clarity.</li>
+  <li>Use <code>matches</code> for concise checks in tests and conditionals.</li>
+  <li>Keep package APIs intentional with <code>export</code> and <code>Type()</code> (export constructors).</li>
+</ol>
+<h2><a href="#4-always-be-compiling-with-lib-check-todo" name="4-always-be-compiling-with-lib-check-todo" class="anchor"><span class="anchor-link"></span></a>4) Always-be-compiling with <code>lib check</code> + <code>todo</code></h2>
+<p>Run typecheck continuously while editing:</p>
+<pre class="prettyprint"><code class="language-sh">./bosatsu lib check
+</code></pre>
+<p>When you know types but not implementation, use <code>todo</code> to keep moving:</p>
+<pre class="prettyprint"><code class="language-bosatsu">def hard_part(a: String, b: Int) -&gt; Bool:
+  todo((a, b))
+</code></pre>
+<p>Rules:</p>
+<ol>
+  <li><code>todo</code> is only available in check-only commands (<code>tool check</code> / <code>lib check</code>).</li>
+  <li>Commands that emit or run code (<code>lib test</code>, <code>lib build</code>, <code>tool eval</code>, etc.)  fail until <code>todo</code> is removed.</li>
+  <li>Keep <code>todo</code> arguments meaningful (usually tuple all planned inputs) so you do  not lose type information during refactors.</li>
+</ol>
+<p>Once placeholders are removed, run:</p>
+<pre class="prettyprint"><code class="language-sh">./bosatsu lib test
+</code></pre>
+<h2><a href="#5-practical-5-minute-loop" name="5-practical-5-minute-loop" class="anchor"><span class="anchor-link"></span></a>5) Practical 5-minute loop</h2>
+<ol>
+  <li>Create one package with one exported function.</li>
+  <li>Add a tiny <code>tests</code> value immediately.</li>
+  <li>Iterate with <code>lib check</code>, using <code>todo</code> for unfinished branches.</li>
+  <li>Replace <code>todo</code> incrementally.</li>
+  <li>Finish with <code>lib test</code>.</li>
+</ol>
+<p>That loop matches how most code in <code>test_workspace</code> evolves: explicit data models, explicit imports/exports, and constant typechecked feedback.</p>
 <div class="source-github">
-The source code for this page can be found <a href="https://github.com/johnynek/bosatsu/tree/master/docs/src/main/paradox/index.md">here</a>.
+The source code for this page can be found <a href="https://github.com/johnynek/bosatsu/tree/master/docs/src/main/paradox/writing_bosatsu_5_minutes.md">here</a>.
 </div>
 
 <div class="nav-next">
-<p><strong>Next:</strong> <a href="design.html">Bosatsu Design Philosophy and Goals</a></p>
+<p><strong>Next:</strong> <a href="language_guide.html">Language Guide</a></p>
 </div>
 </div>
 <div class="large-3 show-for-large column" data-sticky-container>
+<nav class="sidebar sticky" data-sticky data-anchor="docs" data-sticky-on="large">
+<div class="page-nav">
+<div class="nav-title">On this page:</div>
+<div class="nav-toc">
+<ul>
+  <li><a href="writing_bosatsu_5_minutes.html#writing-bosatsu-in-5-minutes" class="header">Writing Bosatsu in 5 minutes</a></li>
+</ul>
+</div>
+</div>
+</nav>
 </div>
 </div>
 
