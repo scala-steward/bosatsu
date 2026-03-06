@@ -2,11 +2,11 @@
 <html class="no-js" lang="en">
 
 <head>
-<title>Bosatsu/Option · Bosatsu Documentation</title>
+<title>Bosatsu/Loops · Bosatsu Documentation</title>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="description" content='paradox docs'/>
-<link rel="canonical" href="https://github.com/johnynek/bosatsugenerated/core_alpha/Bosatsu/Option.html"/>
+<link rel="canonical" href="https://github.com/johnynek/bosatsugenerated/core_alpha/Bosatsu/Loops.html"/>
 <link href="https://fonts.googleapis.com/css?family=Roboto:100normal,100italic,300normal,300italic,400normal,400italic,500normal,500italic,700normal,700italic,900normal,900italicc" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="../../../lib/jquery/jquery.min.js"></script>
 <script type="text/javascript" src="../../../js/page.js"></script>
@@ -112,7 +112,7 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 <ul>
   <li><a href="../../../index.html">Bosatsu Documentation</a></li>
   <li><a href="../../../generated/core_alpha/index.html">Core Alpha API</a></li>
-  <li><code>Bosatsu/Option</code></li>
+  <li><code>Bosatsu/Loops</code></li>
 </ul>
 </div>
 </div>
@@ -120,19 +120,19 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 
 <div class="page-content row">
 <div class="small-12 large-9 column" id="docs">
-<h1><a href="#bosatsu-option" name="bosatsu-option" class="anchor"><span class="anchor-link"></span></a><code>Bosatsu/Option</code></h1>
-<p>source code: - <a href="https://github.com/johnynek/bosatsu/blob/main/test_workspace/Option.bosatsu"><code>test_workspace/Option.bosatsu</code></a></p>
+<h1><a href="#bosatsu-loops" name="bosatsu-loops" class="anchor"><span class="anchor-link"></span></a><code>Bosatsu/Loops</code></h1>
+<p>source code: - <a href="https://github.com/johnynek/bosatsu/blob/main/test_workspace/Loops.bosatsu"><code>test_workspace/Loops.bosatsu</code></a></p>
 <h2><a href="#index" name="index" class="anchor"><span class="anchor-link"></span></a>Index</h2>
 <ul>
-  <li>Values: <a href="#value-eq-option"><code>eq_Option</code></a></li>
+  <li>Values: <a href="#value-range-foldr"><code>range_foldr</code></a></li>
 </ul>
 <h2><a href="#values" name="values" class="anchor"><span class="anchor-link"></span></a>Values</h2>
-<a id="value-eq-option"></a>
-<h3><a href="#eq-option" name="eq-option" class="anchor"><span class="anchor-link"></span></a><code>eq_Option</code></h3>
-<pre class="prettyprint"><code class="language-bosatsu">def eq_Option[a](eq: (a, a) -&gt; Bool) -&gt; (Option[a], Option[a]) -&gt; Bool
+<a id="value-range-foldr"></a>
+<h3><a href="#range-foldr" name="range-foldr" class="anchor"><span class="anchor-link"></span></a><code>range_foldr</code></h3>
+<pre class="prettyprint"><code class="language-bosatsu">def range_foldr[a](top: Int, init: a, fn: (Int, a) -&gt; a) -&gt; a
 </code></pre>
 <div class="nav-next">
-<p><strong>Next:</strong> <a href="../../../generated/core_alpha/Bosatsu/Predef.html"><code>Bosatsu/Predef</code></a></p>
+<p><strong>Next:</strong> <a href="../../../generated/core_alpha/Bosatsu/LsExample.html"><code>Bosatsu/LsExample</code></a></p>
 </div>
 </div>
 <div class="large-3 show-for-large column" data-sticky-container>
@@ -141,7 +141,7 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 <div class="nav-title">On this page:</div>
 <div class="nav-toc">
 <ul>
-  <li><a href="../../../generated/core_alpha/Bosatsu/Option.html#bosatsu-option" class="header"><code>Bosatsu/Option</code></a></li>
+  <li><a href="../../../generated/core_alpha/Bosatsu/Loops.html#bosatsu-loops" class="header"><code>Bosatsu/Loops</code></a></li>
 </ul>
 </div>
 </div>
