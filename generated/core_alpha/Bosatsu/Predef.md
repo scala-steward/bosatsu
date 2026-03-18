@@ -29,26 +29,30 @@ github.base_url=
 [`Tuple29`](#type-tuple29), [`Tuple30`](#type-tuple30), [`Tuple31`](#type-tuple31),
 [`Tuple32`](#type-tuple32), [`Unit`](#type-unit)
 - Values: [`add`](#value-add), [`add_key`](#value-add-key), [`addf`](#value-addf),
-[`and_Int`](#value-and-int), [`build_List`](#value-build-list),
+[`and`](#value-and), [`and_Int`](#value-and-int), [`build_List`](#value-build-list),
 [`char_List_to_String`](#value-char-list-to-string), [`char_to_Int`](#value-char-to-int),
 [`char_to_String`](#value-char-to-string), [`clear_Dict`](#value-clear-dict),
+[`cmp_Bool`](#value-cmp-bool), [`cmp_Comparison`](#value-cmp-comparison),
 [`cmp_Float64`](#value-cmp-float64), [`cmp_Int`](#value-cmp-int), [`cmp_String`](#value-cmp-string),
 [`concat`](#value-concat), [`concat_String`](#value-concat-string), [`div`](#value-div),
-[`divf`](#value-divf), [`empty_Dict`](#value-empty-dict), [`eq_Int`](#value-eq-int),
-[`flat_map_List`](#value-flat-map-list), [`foldl_List`](#value-foldl-list),
-[`foldr_List`](#value-foldr-list), [`gcd_Int`](#value-gcd-int), [`get_key`](#value-get-key),
-[`int_loop`](#value-int-loop), [`int_to_Char`](#value-int-to-char),
+[`divf`](#value-divf), [`empty_Dict`](#value-empty-dict), [`eq_Bool`](#value-eq-bool),
+[`eq_Comparison`](#value-eq-comparison), [`eq_Float64`](#value-eq-float64),
+[`eq_Int`](#value-eq-int), [`eq_String`](#value-eq-string), [`flat_map_List`](#value-flat-map-list),
+[`foldl_List`](#value-foldl-list), [`foldr_List`](#value-foldr-list), [`gcd_Int`](#value-gcd-int),
+[`get_key`](#value-get-key), [`int_loop`](#value-int-loop), [`int_to_Char`](#value-int-to-char),
 [`int_to_String`](#value-int-to-string), [`items`](#value-items),
-[`length_String`](#value-length-string), [`map_List`](#value-map-list), [`mod_Int`](#value-mod-int),
-[`mul`](#value-mul), [`mulf`](#value-mulf), [`not_Int`](#value-not-int), [`or_Int`](#value-or-int),
-[`partition_String`](#value-partition-string), [`popcount_Int`](#value-popcount-int),
-[`range`](#value-range), [`range_fold`](#value-range-fold), [`remove_key`](#value-remove-key),
-[`replicate_List`](#value-replicate-list), [`reverse`](#value-reverse),
-[`reverse_concat`](#value-reverse-concat), [`rpartition_String`](#value-rpartition-string),
-[`shift_left_Int`](#value-shift-left-int), [`shift_right_Int`](#value-shift-right-int),
-[`string_Order`](#value-string-order), [`string_to_Int`](#value-string-to-int), [`sub`](#value-sub),
-[`subf`](#value-subf), [`tail_or_empty_String`](#value-tail-or-empty-string),
-[`trace`](#value-trace), [`uncons_String`](#value-uncons-string), [`uncurry2`](#value-uncurry2),
+[`length_List`](#value-length-list), [`length_String`](#value-length-string),
+[`map_List`](#value-map-list), [`mod_Int`](#value-mod-int), [`mul`](#value-mul),
+[`mulf`](#value-mulf), [`not`](#value-not), [`not_Int`](#value-not-int), [`or`](#value-or),
+[`or_Int`](#value-or-int), [`partition_String`](#value-partition-string),
+[`popcount_Int`](#value-popcount-int), [`range`](#value-range), [`range_fold`](#value-range-fold),
+[`remove_key`](#value-remove-key), [`replicate_List`](#value-replicate-list),
+[`reverse`](#value-reverse), [`reverse_concat`](#value-reverse-concat),
+[`rpartition_String`](#value-rpartition-string), [`shift_left_Int`](#value-shift-left-int),
+[`shift_right_Int`](#value-shift-right-int), [`string_Order`](#value-string-order),
+[`string_to_Int`](#value-string-to-int), [`sub`](#value-sub), [`subf`](#value-subf),
+[`tail_or_empty_String`](#value-tail-or-empty-string), [`trace`](#value-trace),
+[`uncons_String`](#value-uncons-string), [`uncurry2`](#value-uncurry2),
 [`uncurry3`](#value-uncurry3), [`xor_Int`](#value-xor-int)
 
 ## Types
@@ -2282,6 +2286,18 @@ references: [`Float64`](#type-float64)
 def addf(a: Float64, b: Float64) -> Float64
 ```
 
+<a id="value-and"></a>
+
+### `and`
+
+Boolean conjunction.
+
+references: [`Bool`](#type-bool)
+
+```bosatsu
+def and(x: Bool, y: Bool) -> Bool
+```
+
 <a id="value-and-int"></a>
 
 ### `and_Int`
@@ -2352,6 +2368,26 @@ references: [`Dict`](#type-dict)
 
 ```bosatsu
 def clear_Dict[a, b](dict: Dict[a, b]) -> Dict[a, b]
+```
+
+<a id="value-cmp-bool"></a>
+
+### `cmp_Bool`
+
+references: [`Bool`](#type-bool), [`Comparison`](#type-comparison)
+
+```bosatsu
+def cmp_Bool(left: Bool, right: Bool) -> Comparison
+```
+
+<a id="value-cmp-comparison"></a>
+
+### `cmp_Comparison`
+
+references: [`Comparison`](#type-comparison)
+
+```bosatsu
+def cmp_Comparison(left: Comparison, right: Comparison) -> Comparison
 ```
 
 <a id="value-cmp-float64"></a>
@@ -2450,6 +2486,36 @@ references: [`Dict`](#type-dict), [`Order`](#type-order)
 def empty_Dict[a](comp: Order[a]) -> forall b: *. Dict[a, b]
 ```
 
+<a id="value-eq-bool"></a>
+
+### `eq_Bool`
+
+references: [`Bool`](#type-bool)
+
+```bosatsu
+def eq_Bool(left: Bool, right: Bool) -> Bool
+```
+
+<a id="value-eq-comparison"></a>
+
+### `eq_Comparison`
+
+references: [`Bool`](#type-bool), [`Comparison`](#type-comparison)
+
+```bosatsu
+def eq_Comparison(left: Comparison, right: Comparison) -> Bool
+```
+
+<a id="value-eq-float64"></a>
+
+### `eq_Float64`
+
+references: [`Bool`](#type-bool), [`Float64`](#type-float64)
+
+```bosatsu
+def eq_Float64(a: Float64, b: Float64) -> Bool
+```
+
 <a id="value-eq-int"></a>
 
 ### `eq_Int`
@@ -2460,6 +2526,16 @@ references: [`Bool`](#type-bool), [`Int`](#type-int)
 
 ```bosatsu
 def eq_Int(a: Int, b: Int) -> Bool
+```
+
+<a id="value-eq-string"></a>
+
+### `eq_String`
+
+references: [`Bool`](#type-bool), [`String`](#type-string)
+
+```bosatsu
+def eq_String(str0: String, str1: String) -> Bool
 ```
 
 <a id="value-flat-map-list"></a>
@@ -2573,6 +2649,18 @@ references: [`Dict`](#type-dict), [`List`](#type-list), [`Tuple2`](#type-tuple2)
 def items[a, b](dict: Dict[a, b]) -> List[(a, b)]
 ```
 
+<a id="value-length-list"></a>
+
+### `length_List`
+
+Count the number of items in a list.
+
+references: [`Int`](#type-int), [`List`](#type-list)
+
+```bosatsu
+def length_List[a](lst: List[a]) -> Int
+```
+
 <a id="value-length-string"></a>
 
 ### `length_String`
@@ -2633,6 +2721,18 @@ references: [`Float64`](#type-float64)
 def mulf(a: Float64, b: Float64) -> Float64
 ```
 
+<a id="value-not"></a>
+
+### `not`
+
+Boolean negation.
+
+references: [`Bool`](#type-bool)
+
+```bosatsu
+def not(x: Bool) -> Bool
+```
+
 <a id="value-not-int"></a>
 
 ### `not_Int`
@@ -2643,6 +2743,18 @@ references: [`Int`](#type-int)
 
 ```bosatsu
 def not_Int(a: Int) -> Int
+```
+
+<a id="value-or"></a>
+
+### `or`
+
+Boolean disjunction.
+
+references: [`Bool`](#type-bool)
+
+```bosatsu
+def or(x: Bool, y: Bool) -> Bool
 ```
 
 <a id="value-or-int"></a>
