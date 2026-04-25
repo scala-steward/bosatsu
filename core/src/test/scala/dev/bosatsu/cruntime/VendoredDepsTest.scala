@@ -31,8 +31,9 @@ class VendoredDepsTest extends munit.ScalaCheckSuite {
     )
 
   private def cFlagsArg(args: List[String]): Option[String] =
-    args.collectFirst { case arg if arg.startsWith("-DCMAKE_C_FLAGS=") =>
-      arg.stripPrefix("-DCMAKE_C_FLAGS=")
+    args.collectFirst {
+      case arg if arg.startsWith("-DCMAKE_C_FLAGS=") =>
+        arg.stripPrefix("-DCMAKE_C_FLAGS=")
     }
 
   test("staticLibFileName follows vendored recipe naming") {
@@ -56,7 +57,9 @@ class VendoredDepsTest extends munit.ScalaCheckSuite {
     )
   }
 
-  test("bdwgc runtime requirements carry GC_THREADS for runtime and generated code") {
+  test(
+    "bdwgc runtime requirements carry GC_THREADS for runtime and generated code"
+  ) {
     val dep =
       dependency(
         "bdwgc",
@@ -73,7 +76,9 @@ class VendoredDepsTest extends munit.ScalaCheckSuite {
     )
   }
 
-  test("bdwgc configure args add the Darwin-only define and keep common switches") {
+  test(
+    "bdwgc configure args add the Darwin-only define and keep common switches"
+  ) {
     val macosArgs =
       VendoredDeps.bdwgcConfigureArgs(
         normalizedHostOs = "macos",
@@ -115,7 +120,9 @@ class VendoredDepsTest extends munit.ScalaCheckSuite {
     assertEquals(cFlagsArg(linuxArgs), None)
   }
 
-  test("bdwgc configure args use the expected CMake build type for debug and release") {
+  test(
+    "bdwgc configure args use the expected CMake build type for debug and release"
+  ) {
     val debugArgs =
       VendoredDeps.bdwgcConfigureArgs(
         normalizedHostOs = "macos",
@@ -139,7 +146,9 @@ class VendoredDepsTest extends munit.ScalaCheckSuite {
     assert(releaseArgs.contains("-DCMAKE_BUILD_TYPE=Release"))
   }
 
-  test("bdwgc configure args emit a valid Darwin CFLAGS entry when inherited flags are empty") {
+  test(
+    "bdwgc configure args emit a valid Darwin CFLAGS entry when inherited flags are empty"
+  ) {
     val args =
       VendoredDeps.bdwgcConfigureArgs(
         normalizedHostOs = "macos",
@@ -153,7 +162,9 @@ class VendoredDepsTest extends munit.ScalaCheckSuite {
     assertEquals(cFlagsArg(args), Some(noDescCatchExceptionRaise))
   }
 
-  test("bdwgc configure args do not duplicate the Darwin define when it is already inherited") {
+  test(
+    "bdwgc configure args do not duplicate the Darwin define when it is already inherited"
+  ) {
     val args =
       VendoredDeps.bdwgcConfigureArgs(
         normalizedHostOs = "macos",
@@ -177,7 +188,9 @@ class VendoredDepsTest extends munit.ScalaCheckSuite {
       "-DMY_FLAG=1"
     )
 
-  property("Darwin bdwgc configure args retain inherited CFLAGS tokens and inject the define once") {
+  property(
+    "Darwin bdwgc configure args retain inherited CFLAGS tokens and inject the define once"
+  ) {
     forAll(Gen.listOf(safeCFlagTokenGen)) { tokens =>
       val inherited =
         Option.when(tokens.nonEmpty)(tokens.mkString(" "))

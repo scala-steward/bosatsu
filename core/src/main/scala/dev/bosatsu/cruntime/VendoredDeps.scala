@@ -31,7 +31,9 @@ object VendoredDeps {
 
     def linkFlags: List[String] =
       resolved
-        .flatMap(rd => rd.metadata.static_libs ::: rd.metadata.system_link_flags)
+        .flatMap(rd =>
+          rd.metadata.static_libs ::: rd.metadata.system_link_flags
+        )
         .distinct
   }
 
@@ -47,7 +49,7 @@ object VendoredDeps {
 
     val manifestPath = platformIO.resolve(runtimeRoot, CDeps.ManifestPath)
     platformIO.fsDataType(manifestPath).flatMap {
-      case None => moduleIOMonad.pure(None)
+      case None                            => moduleIOMonad.pure(None)
       case Some(PlatformIO.FSDataType.Dir) =>
         moduleIOMonad.raiseError(
           CliException.Basic(
@@ -67,7 +69,7 @@ object VendoredDeps {
     import platformIO.moduleIOMonad
 
     maybeLoadManifest(runtimeRoot)(platformIO).flatMap {
-      case None => moduleIOMonad.pure(None)
+      case None           => moduleIOMonad.pure(None)
       case Some(manifest) =>
         CDeps.orderedDependencies(manifest) match {
           case Left(err) =>
@@ -76,9 +78,14 @@ object VendoredDeps {
             )
           case Right(ordered) =>
             for {
-              context <- buildContext(manifest.recipe_version, profile)(platformIO)
+              context <- buildContext(manifest.recipe_version, profile)(
+                platformIO
+              )
               resolved <- ordered.foldLeftM(
-                (List.empty[ResolvedDependency[P]], Map.empty[String, ResolvedDependency[P]])
+                (
+                  List.empty[ResolvedDependency[P]],
+                  Map.empty[String, ResolvedDependency[P]]
+                )
               ) { case ((acc, byName), dependency) =>
                 ensureDependency(repoRoot, dependency, context, byName)(
                   platformIO
@@ -99,7 +106,7 @@ object VendoredDeps {
     platformIO.readUtf8(manifestPath).flatMap { content =>
       CDeps.parseManifestString(content) match {
         case Right(manifest) => moduleIOMonad.pure(manifest)
-        case Left(msg) =>
+        case Left(msg)       =>
           moduleIOMonad.raiseError(
             CliException.Basic(
               s"failed to parse vendored dependency manifest ${platformIO.pathToString(manifestPath)}: $msg"
@@ -133,7 +140,9 @@ object VendoredDeps {
       case None =>
         for {
           archive <- ensureArchive(repoRoot, dependency)(platformIO)
-          sourceRoot <- ensureSourceTree(repoRoot, dependency, archive)(platformIO)
+          sourceRoot <- ensureSourceTree(repoRoot, dependency, archive)(
+            platformIO
+          )
           metadata <- platformIO.withTempPrefix(s"bosatsu-${dependency.name}-") {
             tempRoot =>
               publishDependency(
@@ -181,7 +190,7 @@ object VendoredDeps {
       _ <- replaceDirectory(finalBuildDir, publishRoot)(platformIO)
       loaded <- cachedMetadata(finalBuildDir)(platformIO).flatMap {
         case Some(value) => moduleIOMonad.pure(value)
-        case None =>
+        case None        =>
           moduleIOMonad.raiseError(
             CliException.Basic(
               s"failed to publish vendored dependency ${dependency.name} into ${platformIO.pathToString(finalBuildDir)}"
@@ -209,16 +218,26 @@ object VendoredDeps {
     val recordedStaticLib = platformIO.resolve(recordedLibDir, staticLibFile)
 
     for {
-      _ <- requireDir(includeDir, s"vendored include dir for ${dependency.name}")(
+      _ <- requireDir(
+        includeDir,
+        s"vendored include dir for ${dependency.name}"
+      )(
         platformIO
       )
-      _ <- requireFile(staticLib, s"vendored static lib for ${dependency.name}")(
+      _ <- requireFile(
+        staticLib,
+        s"vendored static lib for ${dependency.name}"
+      )(
         platformIO
       )
-      systemLinkFlags <- systemLinkFlagsFor(dependency, installedPrefix)(platformIO)
+      systemLinkFlags <- systemLinkFlagsFor(dependency, installedPrefix)(
+        platformIO
+      )
       normalizedOs = CDeps.normalizeOs(context.os)
       normalizedArch = CDeps.normalizeArch(context.arch)
-      normalizedFamily = CDeps.normalizeToolchainFamily(context.toolchain_family)
+      normalizedFamily = CDeps.normalizeToolchainFamily(
+        context.toolchain_family
+      )
       metadata = CDeps.Metadata(
         schema_version = CDeps.SchemaVersion,
         name = dependency.name,
@@ -344,8 +363,7 @@ object VendoredDeps {
       flag: String
   ): String =
     inheritedCFlags.map(_.trim).filter(_.nonEmpty) match {
-      case Some(existing)
-          if existing.split("\\s+").iterator.contains(flag) =>
+      case Some(existing) if existing.split("\\s+").iterator.contains(flag) =>
         existing
       case Some(existing) =>
         s"$existing $flag"
@@ -370,7 +388,10 @@ object VendoredDeps {
   ): CDeps.RuntimeRequirements =
     dependency.recipe match {
       case CDeps.BdwgcCmakeStatic
-          if optionBool(dependency.options.getOrElse(JObject(Nil)), "threadsafe")
+          if optionBool(
+            dependency.options.getOrElse(JObject(Nil)),
+            "threadsafe"
+          )
             .getOrElse(true) =>
         CDeps.RuntimeRequirements(
           "-DGC_THREADS" :: Nil,
@@ -424,7 +445,9 @@ object VendoredDeps {
       compilerVersion <- cmdVersion(compilerPath)
       arEnv <- readEnv("AR")
       arCmd = arEnv.getOrElse("ar")
-      archiverPath <- resolveExecutable(arCmd).map(Some(_)).handleError(_ => None)
+      archiverPath <- resolveExecutable(arCmd)
+        .map(Some(_))
+        .handleError(_ => None)
       archiverVersion <- archiverPath match {
         case Some(path) =>
           cmdVersion(path).map(Some(_)).handleError(_ => None)
@@ -435,7 +458,10 @@ object VendoredDeps {
       }
       hostOs <- platformIO.hostOs
       hostArch <- platformIO.hostArch
-      toolchainFamily = CDeps.detectToolchainFamily(compilerPath, compilerVersion)
+      toolchainFamily = CDeps.detectToolchainFamily(
+        compilerPath,
+        compilerVersion
+      )
     } yield CDeps.BuildContext(
       os = CDeps.normalizeOs(hostOs),
       arch = CDeps.normalizeArch(hostArch),
@@ -458,7 +484,9 @@ object VendoredDeps {
 
     val archivePath = archiveCachePath(repoRoot, dependency)(platformIO)
 
-    def fetchFromUri(uri: String): F[Either[PlatformIO.FetchHashFailure, Unit]] =
+    def fetchFromUri(
+        uri: String
+    ): F[Either[PlatformIO.FetchHashFailure, Unit]] =
       platformIO.fetchHash(
         dependency.hash.algo,
         dependency.hash.value,
@@ -485,7 +513,7 @@ object VendoredDeps {
           )
         case uri :: rest =>
           fetchFromUri(uri).flatMap {
-            case Right(_) => moduleIOMonad.pure(archivePath)
+            case Right(_)  => moduleIOMonad.pure(archivePath)
             case Left(err) => loop(rest, err :: failures)
           }
       }
@@ -494,8 +522,9 @@ object VendoredDeps {
       archiveParent <- parentOrError(archivePath, "archive parent")(platformIO)
       _ <- ensureDir(archiveParent)(platformIO)
       validExisting <- verifiedHash(archivePath, dependency)(platformIO)
-      archive <- if (validExisting) moduleIOMonad.pure(archivePath)
-      else loop(dependency.uris, Nil)
+      archive <-
+        if (validExisting) moduleIOMonad.pure(archivePath)
+        else loop(dependency.uris, Nil)
     } yield archive
   }
 
@@ -569,7 +598,7 @@ object VendoredDeps {
       case true  =>
         platformIO.readUtf8(metadataPath).flatMap { content =>
           CDeps.parseMetadataString(content) match {
-            case Left(_) => moduleIOMonad.pure(None)
+            case Left(_)         => moduleIOMonad.pure(None)
             case Right(metadata) =>
               validateMetadataPaths(metadata)(platformIO).map {
                 case true  => Some(metadata)
@@ -616,25 +645,28 @@ object VendoredDeps {
     }
   }
 
-  private[cruntime] def parsePkgConfigSystemFlags(content: String): List[String] = {
+  private[cruntime] def parsePkgConfigSystemFlags(
+      content: String
+  ): List[String] = {
     val variablePattern = "\\$\\{([^}]+)\\}".r
 
     val (variables, fields) =
-      content.linesIterator.foldLeft((Map.empty[String, String], Map.empty[String, String])) {
-        case ((vars, acc), rawLine) =>
-          val line = rawLine.trim
-          if (line.isEmpty || line.startsWith("#")) (vars, acc)
-          else if (line.contains("=") && !line.contains(":")) {
-            val idx = line.indexOf('=')
-            val key = line.substring(0, idx).trim
-            val value = line.substring(idx + 1).trim
-            (vars.updated(key, value), acc)
-          } else if (line.contains(":")) {
-            val idx = line.indexOf(':')
-            val key = line.substring(0, idx).trim
-            val value = line.substring(idx + 1).trim
-            (vars, acc.updated(key, value))
-          } else (vars, acc)
+      content.linesIterator.foldLeft(
+        (Map.empty[String, String], Map.empty[String, String])
+      ) { case ((vars, acc), rawLine) =>
+        val line = rawLine.trim
+        if (line.isEmpty || line.startsWith("#")) (vars, acc)
+        else if (line.contains("=") && !line.contains(":")) {
+          val idx = line.indexOf('=')
+          val key = line.substring(0, idx).trim
+          val value = line.substring(idx + 1).trim
+          (vars.updated(key, value), acc)
+        } else if (line.contains(":")) {
+          val idx = line.indexOf(':')
+          val key = line.substring(0, idx).trim
+          val value = line.substring(idx + 1).trim
+          (vars, acc.updated(key, value))
+        } else (vars, acc)
       }
 
     def expand(input: String): String = {
@@ -658,8 +690,7 @@ object VendoredDeps {
     }
 
     val rawFlags =
-      List(fields.get("Libs"), fields.get("Libs.private"))
-        .flatten
+      List(fields.get("Libs"), fields.get("Libs.private")).flatten
         .flatMap(expand(_).split("\\s+"))
         .map(_.trim)
         .filter(_.nonEmpty)
@@ -680,13 +711,17 @@ object VendoredDeps {
       if (seen.contains(name)) Nil
       else
         resolvedDependencies.get(name).toList.flatMap { resolved =>
-          resolved.buildKey :: resolved.dependency.dependencies.getOrElse(Nil).flatMap {
-            depName =>
-            loop(depName, seen + name)
-          }
+          resolved.buildKey :: resolved.dependency.dependencies
+            .getOrElse(Nil)
+            .flatMap { depName =>
+              loop(depName, seen + name)
+            }
         }
 
-    dependency.dependencies.getOrElse(Nil).flatMap(depName => loop(depName, Set.empty)).distinct
+    dependency.dependencies
+      .getOrElse(Nil)
+      .flatMap(depName => loop(depName, Set.empty))
+      .distinct
   }
 
   private def writeMetadata[F[_], P](
