@@ -1,6 +1,7 @@
 #include "bosatsu_ext_Bosatsu_l_IO_l_Core.h"
 #include "bosatsu_ext_Bosatsu_l_IO_l_Bytes.h"
 #include "bosatsu_ext_Bosatsu_l_Prog.h"
+#include "bosatsu_ext_Bosatsu_l_Prog_internal.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -15,6 +16,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <uv.h>
 
 #if defined(__APPLE__) || defined(__linux__)
 int mkstemps(char *template, int suffixlen);
@@ -66,6 +68,15 @@ typedef struct
   int close_on_close;
   int closed;
 } BSTS_Core_Handle;
+
+typedef struct
+{
+  uv_timer_t timer;
+  BSTS_Prog_Suspended *suspended;
+  uint64_t timeout_millis;
+  BValue error;
+  _Bool is_error;
+} BSTS_Core_Sleep_Request;
 
 static BValue bsts_ioerror_context(const char *context)
 {
@@ -203,6 +214,15 @@ static BValue bsts_ioerror_from_errno_default(int err, const char *context)
 #endif
   }
   return bsts_ioerror_from_errno(err, context);
+}
+
+static BValue bsts_ioerror_from_uv(int err, const char *context)
+{
+  if (err < 0)
+  {
+    return bsts_ioerror_from_errno(-err, context);
+  }
+  return bsts_ioerror_from_errno_default(err, context);
 }
 
 static inline BValue bsts_ioerror_invalid_argument(const char *context)
@@ -2020,15 +2040,49 @@ static BValue bsts_core_get_env_effect(BValue name_value)
         bsts_ioerror_from_errno_default(errno, "reading environment"));
   }
 
-  const char *value = getenv(name);
-  free(name);
-
-  if (!value)
+  char stack_value[256];
+  size_t size = sizeof(stack_value);
+  int getenv_result = uv_os_getenv(name, stack_value, &size);
+  if (getenv_result == UV_ENOENT)
   {
+    free(name);
     return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_option_none());
   }
 
-  BValue v = bsts_string_from_utf8_bytes_static_null_term(value);
+  if (getenv_result == UV_ENOBUFS)
+  {
+    size_t heap_capacity = size;
+    char *heap_value = (char *)malloc(heap_capacity);
+    if (!heap_value)
+    {
+      free(name);
+      return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
+          bsts_ioerror_from_errno_default(errno, "reading environment"));
+    }
+
+    size = heap_capacity;
+    getenv_result = uv_os_getenv(name, heap_value, &size);
+    free(name);
+    if (getenv_result != 0)
+    {
+      free(heap_value);
+      return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
+          bsts_ioerror_from_uv(getenv_result, "reading environment"));
+    }
+
+    BValue v = bsts_string_from_utf8_bytes_copy(strlen(heap_value), heap_value);
+    free(heap_value);
+    return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_option_some(v));
+  }
+
+  free(name);
+  if (getenv_result != 0)
+  {
+    return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
+        bsts_ioerror_from_uv(getenv_result, "reading environment"));
+  }
+
+  BValue v = bsts_string_from_utf8_bytes_copy(strlen(stack_value), stack_value);
   return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_option_some(v));
 }
 
@@ -2049,16 +2103,17 @@ static BValue bsts_core_wait_effect(BValue process)
 static BValue bsts_core_now_wall_effect(BValue unit)
 {
   (void)unit;
-  struct timespec ts;
-  if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
+  uv_timeval64_t tv;
+  int time_result = uv_gettimeofday(&tv);
+  if (time_result != 0)
   {
     return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
-        bsts_ioerror_from_errno_default(errno, "reading wall clock"));
+        bsts_ioerror_from_uv(time_result, "reading wall clock"));
   }
 
-  BValue sec_i = bsts_integer_from_int64((int64_t)ts.tv_sec);
+  BValue sec_i = bsts_integer_from_int64((int64_t)tv.tv_sec);
   BValue billion = bsts_integer_from_int(1000000000);
-  BValue nsec_i = bsts_integer_from_int((int32_t)ts.tv_nsec);
+  BValue nsec_i = bsts_integer_from_int64((int64_t)tv.tv_usec * 1000);
   BValue nanos = bsts_integer_add(bsts_integer_times(sec_i, billion), nsec_i);
   return ___bsts_g_Bosatsu_l_Prog_l_pure(nanos);
 }
@@ -2066,18 +2121,68 @@ static BValue bsts_core_now_wall_effect(BValue unit)
 static BValue bsts_core_now_mono_effect(BValue unit)
 {
   (void)unit;
-  struct timespec ts;
-  if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+  return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_integer_from_uint64(uv_hrtime()));
+}
+
+static uint64_t bsts_sleep_timeout_millis(uint64_t nanos)
+{
+  uint64_t millis = nanos / 1000000ULL;
+  if ((nanos % 1000000ULL) != 0ULL)
   {
-    return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
-        bsts_ioerror_from_errno_default(errno, "reading monotonic clock"));
+    millis += 1ULL;
+  }
+  return millis;
+}
+
+static void bsts_core_sleep_close_cb(uv_handle_t *handle)
+{
+  BSTS_Core_Sleep_Request *request = (BSTS_Core_Sleep_Request *)handle->data;
+  if (request->is_error)
+  {
+    bsts_Bosatsu_Prog_suspended_error(request->suspended, request->error);
+  }
+  else
+  {
+    bsts_Bosatsu_Prog_suspended_success(request->suspended, bsts_unit_value());
+  }
+}
+
+static void bsts_core_sleep_timer_cb(uv_timer_t *timer)
+{
+  uv_timer_stop(timer);
+  uv_close((uv_handle_t *)timer, bsts_core_sleep_close_cb);
+}
+
+static int bsts_core_sleep_start(BSTS_Prog_Suspended *suspended)
+{
+  BSTS_Core_Sleep_Request *request =
+      BSTS_PTR(BSTS_Core_Sleep_Request, bsts_Bosatsu_Prog_suspended_request(suspended));
+  request->suspended = suspended;
+
+  int timer_result = uv_timer_init(
+      bsts_Bosatsu_Prog_suspended_loop(suspended),
+      &request->timer);
+  if (timer_result != 0)
+  {
+    bsts_Bosatsu_Prog_suspended_error(
+        suspended,
+        bsts_ioerror_from_uv(timer_result, "starting sleep timer"));
+    return 0;
   }
 
-  BValue sec_i = bsts_integer_from_int64((int64_t)ts.tv_sec);
-  BValue billion = bsts_integer_from_int(1000000000);
-  BValue nsec_i = bsts_integer_from_int((int32_t)ts.tv_nsec);
-  BValue nanos = bsts_integer_add(bsts_integer_times(sec_i, billion), nsec_i);
-  return ___bsts_g_Bosatsu_l_Prog_l_pure(nanos);
+  request->timer.data = request;
+  timer_result = uv_timer_start(
+      &request->timer,
+      bsts_core_sleep_timer_cb,
+      request->timeout_millis,
+      0);
+  if (timer_result != 0)
+  {
+    request->is_error = 1;
+    request->error = bsts_ioerror_from_uv(timer_result, "starting sleep timer");
+    uv_close((uv_handle_t *)&request->timer, bsts_core_sleep_close_cb);
+  }
+  return 0;
 }
 
 static BValue bsts_core_sleep_effect(BValue duration)
@@ -2091,26 +2196,22 @@ static BValue bsts_core_sleep_effect(BValue duration)
         bsts_ioerror_invalid_argument("sleep duration must be >= 0"));
   }
 
-  uint64_t nanos = bsts_integer_to_low_uint64(nanos_value);
-  struct timespec ts;
-  ts.tv_sec = (time_t)(nanos / 1000000000ULL);
-  ts.tv_nsec = (long)(nanos % 1000000000ULL);
-
-  errno = 0;
-  if (nanosleep(&ts, NULL) != 0)
+  BSTS_Core_Sleep_Request *request =
+      (BSTS_Core_Sleep_Request *)GC_malloc(sizeof(BSTS_Core_Sleep_Request));
+  if (request == NULL)
   {
-#ifdef EINTR
-    if (errno == EINTR)
-    {
-      return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
-          bsts_ioerror_known(BSTS_IOERR_Interrupted, "sleep interrupted"));
-    }
-#endif
-    return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
-        bsts_ioerror_from_errno_default(errno, "sleep"));
+    perror("GC_malloc failure in bsts_core_sleep_effect");
+    abort();
   }
 
-  return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_unit_value());
+  request->suspended = NULL;
+  request->timeout_millis =
+      bsts_sleep_timeout_millis(bsts_integer_to_low_uint64(nanos_value));
+  request->error = bsts_unit_value();
+  request->is_error = 0;
+  return bsts_Bosatsu_Prog_suspend(
+      BSTS_VALUE_FROM_PTR(request),
+      bsts_core_sleep_start);
 }
 
 BValue ___bsts_g_Bosatsu_l_IO_l_Core_l_path__sep()
