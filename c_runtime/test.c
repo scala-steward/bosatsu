@@ -6,6 +6,7 @@
 #include "bosatsu_ext_Bosatsu_l_Num_l_Float64.h"
 #include "bosatsu_ext_Bosatsu_l_Num_l_Int64.h"
 #include "bosatsu_ext_Bosatsu_l_IO_l_Core.h"
+#include "bosatsu_ext_Bosatsu_l_IO_l_Bytes.h"
 #include "bosatsu_ext_Bosatsu_l_Prog.h"
 #include "bosatsu_ext_Bosatsu_l_Prog_internal.h"
 #include <stdlib.h>
@@ -15,13 +16,16 @@
 #include <uv.h>
 #if !defined(_WIN32)
 #include <signal.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
 #include "gc.h"
 
-void assert(_Bool cond, char* message) {
+unsigned int bsts_core_test_uv_io_chunk_size(size_t len);
+
+void assert(_Bool cond, const char* message) {
   if (!cond) {
     printf("%s\n", message);
     exit(1);
@@ -77,6 +81,25 @@ void assert_u64_equals(uint64_t got, uint64_t expected, const char* message) {
 
 void assert_int64_bits(BValue value, uint64_t expected, const char* message) {
   assert_u64_equals(bsts_int64_to_bits(value), expected, message);
+}
+
+static void test_io_core_uv_chunk_sizes(void) {
+  assert(
+      bsts_core_test_uv_io_chunk_size(0) == 0U,
+      "IO/Core libuv chunk size should preserve zero-length buffers");
+  assert(
+      bsts_core_test_uv_io_chunk_size((size_t)INT_MAX) == (unsigned int)INT_MAX,
+      "IO/Core libuv chunk size should allow INT_MAX-byte buffers");
+#if SIZE_MAX > INT_MAX
+  assert(
+      bsts_core_test_uv_io_chunk_size((size_t)INT_MAX + 1U) == (unsigned int)INT_MAX,
+      "IO/Core libuv chunk size should cap buffers above INT_MAX");
+#endif
+#if SIZE_MAX > UINT_MAX
+  assert(
+      bsts_core_test_uv_io_chunk_size((size_t)UINT_MAX + 1U) == (unsigned int)INT_MAX,
+      "IO/Core libuv chunk size should not wrap 4GB buffers to zero");
+#endif
 }
 
 void assert_option_int64_bits(BValue opt, uint64_t expected, const char* message) {
@@ -530,6 +553,790 @@ static BValue io_core_sleep_repeat_test_fn(BValue arg) {
   return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
       ___bsts_g_Bosatsu_l_IO_l_Core_l_sleep(bsts_integer_from_int(0)),
       alloc_boxed_pure_fn1(io_core_sleep_repeat_first_fn));
+}
+
+static char io_core_file_missing_path[PATH_MAX];
+static char io_core_file_existing_path[PATH_MAX];
+static char io_core_file_close_path[PATH_MAX];
+static char io_core_file_closed_read_path[PATH_MAX];
+static char io_core_file_utf8_path[PATH_MAX];
+static char io_core_file_bytes_path[PATH_MAX];
+static char io_core_file_empty_path[PATH_MAX];
+static char io_core_file_copy_src_path[PATH_MAX];
+static char io_core_file_copy_dst_path[PATH_MAX];
+static char io_core_file_copy_limit_dst_path[PATH_MAX];
+static char io_core_file_invalid_utf8_path[PATH_MAX];
+static char io_core_file_write_only_path[PATH_MAX];
+static char io_core_file_read_only_path[PATH_MAX];
+static char io_core_file_temp_created_path[PATH_MAX];
+static char io_core_dir_root_path[PATH_MAX];
+static char io_core_dir_missing_path[PATH_MAX];
+static char io_core_dir_mkdir_path[PATH_MAX];
+static char io_core_dir_mkdir_nested_path[PATH_MAX];
+static char io_core_dir_mode_path[PATH_MAX];
+static char io_core_dir_list_path[PATH_MAX];
+static char io_core_dir_list_a_path[PATH_MAX];
+static char io_core_dir_list_b_path[PATH_MAX];
+static char io_core_dir_stat_file_path[PATH_MAX];
+static char io_core_dir_stat_symlink_path[PATH_MAX];
+static char io_core_dir_remove_file_path[PATH_MAX];
+static char io_core_dir_remove_nonempty_path[PATH_MAX];
+static char io_core_dir_remove_nonempty_child_path[PATH_MAX];
+static char io_core_dir_remove_tree_path[PATH_MAX];
+static char io_core_dir_remove_tree_child_path[PATH_MAX];
+static char io_core_dir_remove_tree_file_path[PATH_MAX];
+static char io_core_dir_rename_from_path[PATH_MAX];
+static char io_core_dir_rename_to_path[PATH_MAX];
+static char io_core_dir_temp_created_path[PATH_MAX];
+
+static BValue io_core_path_value(const char* path) {
+  return bsts_string_from_utf8_bytes_copy(strlen(path), path);
+}
+
+static BValue io_core_bytes_value(const uint8_t* data, int len) {
+  uint8_t* owned = NULL;
+  if (len > 0) {
+    owned = (uint8_t*)GC_malloc_atomic((size_t)len);
+    if (owned == NULL) {
+      perror("GC_malloc_atomic failure in io_core_bytes_value");
+      exit(1);
+    }
+    memcpy(owned, data, (size_t)len);
+  }
+  return bsts_bytes_wrap(owned, 0, len);
+}
+
+static void io_core_test_unlink(const char* path) {
+  uv_fs_t req;
+  (void)uv_fs_unlink(NULL, &req, path, NULL);
+  uv_fs_req_cleanup(&req);
+}
+
+static void io_core_test_rmdir(const char* path) {
+  uv_fs_t req;
+  (void)uv_fs_rmdir(NULL, &req, path, NULL);
+  uv_fs_req_cleanup(&req);
+}
+
+static void io_core_test_mkdir(const char* path) {
+  uv_fs_t req;
+  int result = uv_fs_mkdir(NULL, &req, path, 0777, NULL);
+  uv_fs_req_cleanup(&req);
+  assert(result == 0, "creating IO/Core directory fixture should succeed");
+}
+
+static _Bool io_core_test_path_exists(const char* path) {
+  uv_fs_t req;
+  int result = uv_fs_lstat(NULL, &req, path, NULL);
+  uv_fs_req_cleanup(&req);
+  return result == 0;
+}
+
+static void io_core_write_fixture(const char* path, const uint8_t* data, size_t len) {
+  FILE* file = fopen(path, "wb");
+  assert(file != NULL, "creating IO/Core file fixture should succeed");
+  if (len > 0) {
+    assert(
+        fwrite(data, 1, len, file) == len,
+        "writing IO/Core file fixture should write all bytes");
+  }
+  assert(fclose(file) == 0, "closing IO/Core file fixture should succeed");
+}
+
+static void io_core_read_fixture(const char* path, uint8_t* data, size_t len, const char* message) {
+  FILE* file = fopen(path, "rb");
+  assert(file != NULL, "opening IO/Core file fixture should succeed");
+  if (len > 0) {
+    assert(fread(data, 1, len, file) == len, message);
+  }
+  assert(fgetc(file) == EOF, message);
+  assert(fclose(file) == 0, "closing IO/Core file fixture should succeed");
+}
+
+static void assert_bytes_equal(BValue bytes, const uint8_t* expected, int expected_len, const char* message) {
+  BSTS_Bytes* got = bsts_bytes_unbox(bytes);
+  if (got->len != expected_len) {
+    printf("%s\nexpected len: %d\ngot len: %d\n", message, expected_len, got->len);
+    exit(1);
+  }
+  if (expected_len > 0 && memcmp(got->data + got->offset, expected, (size_t)expected_len) != 0) {
+    printf("%s\nbyte payload mismatch\n", message);
+    exit(1);
+  }
+}
+
+static void assert_option_bytes_equal(BValue opt, const uint8_t* expected, int expected_len, const char* message) {
+  if (get_variant(opt) != 1) {
+    printf("%s\nexpected: Some(Bytes)\n", message);
+    exit(1);
+  }
+  assert_bytes_equal(get_enum_index(opt, 0), expected, expected_len, message);
+}
+
+static void assert_path_list_equals(BValue list, const char** expected, size_t expected_len, const char* message) {
+  BValue cursor = list;
+  for (size_t idx = 0; idx < expected_len; idx++) {
+    if (get_variant(cursor) != 1) {
+      printf("%s\nexpected path list item at index: %zu\n", message, idx);
+      exit(1);
+    }
+    assert_string_equals(get_enum_index(cursor, 0), expected[idx], message);
+    cursor = get_enum_index(cursor, 1);
+  }
+  if (get_variant(cursor) != 0) {
+    printf("%s\nexpected end of path list\n", message);
+    exit(1);
+  }
+}
+
+static void assert_stat_kind(BValue stat_opt, unsigned char expected_kind, const char* message) {
+  if (get_variant(stat_opt) != 1) {
+    printf("%s\nexpected Some(FileStat)\n", message);
+    exit(1);
+  }
+  BValue stat_value = get_enum_index(stat_opt, 0);
+  BValue kind = get_struct_index(stat_value, 0);
+  if (get_variant(kind) != expected_kind) {
+    printf("%s\nexpected kind: %u\ngot: %u\n", message, expected_kind, get_variant(kind));
+    exit(1);
+  }
+}
+
+static int stat_mode_bits_from_option(BValue stat_opt) {
+  if (get_variant(stat_opt) != 1) {
+    printf("expected Some(FileStat) while reading mode bits\n");
+    exit(1);
+  }
+  BValue stat_value = get_enum_index(stat_opt, 0);
+  BValue mode_opt = get_struct_index(stat_value, 3);
+  if (get_variant(mode_opt) != 1) {
+    printf("expected stat posix_mode on this C runtime target\n");
+    exit(1);
+  }
+  return bsts_integer_to_int32(get_enum_index(mode_opt, 0));
+}
+
+static BValue io_core_open_missing_read_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+      io_core_path_value(io_core_file_missing_path),
+      alloc_enum0(0));
+}
+
+static BValue io_core_create_new_existing_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+      io_core_path_value(io_core_file_existing_path),
+      alloc_enum0(3));
+}
+
+static BValue io_core_close_again_fn(BValue* slots, BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_close(slots[0]);
+}
+
+static BValue io_core_close_first_fn(BValue handle) {
+  BValue slots[1] = { handle };
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_close(handle),
+      alloc_closure1(1, slots, io_core_close_again_fn));
+}
+
+static BValue io_core_close_twice_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_close_path),
+          alloc_enum0(1)),
+      alloc_boxed_pure_fn1(io_core_close_first_fn));
+}
+
+static BValue io_core_read_after_close_fn(BValue* slots, BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_read__bytes(
+      slots[0],
+      bsts_integer_from_int(1));
+}
+
+static BValue io_core_close_before_read_fn(BValue handle) {
+  BValue slots[1] = { handle };
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_close(handle),
+      alloc_closure1(1, slots, io_core_read_after_close_fn));
+}
+
+static BValue io_core_read_closed_handle_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_closed_read_path),
+          alloc_enum0(1)),
+      alloc_boxed_pure_fn1(io_core_close_before_read_fn));
+}
+
+static BValue io_core_close_slot0_fn(BValue* slots, BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_close(slots[0]);
+}
+
+static BValue io_core_write_utf8_flush_fn(BValue* slots, BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_flush(slots[0]),
+      alloc_closure1(1, slots, io_core_close_slot0_fn));
+}
+
+static BValue io_core_write_utf8_close_fn(BValue* slots, BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_write__utf8(
+          slots[0],
+          bsts_string_from_utf8_bytes_static(8, "hello-\xc2\xb5")),
+      alloc_closure1(1, slots, io_core_write_utf8_flush_fn));
+}
+
+static BValue io_core_write_utf8_opened_fn(BValue handle) {
+  BValue slots[1] = { handle };
+  return io_core_write_utf8_close_fn(slots, bsts_unit_value());
+}
+
+static BValue io_core_write_utf8_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_utf8_path),
+          alloc_enum0(1)),
+      alloc_boxed_pure_fn1(io_core_write_utf8_opened_fn));
+}
+
+static BValue io_core_read_utf8_eof_assert_fn(BValue* slots, BValue arg) {
+  assert_option_none(arg, "IO/Core read_utf8 should return None at EOF");
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_close(slots[0]);
+}
+
+static BValue io_core_read_utf8_after_some_fn(BValue* slots, BValue arg) {
+  if (get_variant(arg) != 1) {
+    printf("IO/Core read_utf8 should return Some text before EOF\n");
+    exit(1);
+  }
+  assert_string_equals(
+      get_enum_index(arg, 0),
+      "hello-\xc2\xb5",
+      "IO/Core read_utf8 should preserve UTF-8 text");
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_read__utf8(slots[0], bsts_integer_from_int(32)),
+      alloc_closure1(1, slots, io_core_read_utf8_eof_assert_fn));
+}
+
+static BValue io_core_read_utf8_test_fn(BValue handle) {
+  BValue slots[1] = { handle };
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_read__utf8(handle, bsts_integer_from_int(32)),
+      alloc_closure1(1, slots, io_core_read_utf8_after_some_fn));
+}
+
+static BValue io_core_read_utf8_file_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_utf8_path),
+          alloc_enum0(0)),
+      alloc_boxed_pure_fn1(io_core_read_utf8_test_fn));
+}
+
+static BValue io_core_write_bytes_flush_fn(BValue* slots, BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_flush(slots[0]),
+      alloc_closure1(1, slots, io_core_close_slot0_fn));
+}
+
+static BValue io_core_write_bytes_close_fn(BValue* slots, BValue arg) {
+  (void)arg;
+  static const uint8_t payload[] = {0, 1, 2, 253, 254, 255};
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_write__bytes(
+          slots[0],
+          io_core_bytes_value(payload, (int)sizeof(payload))),
+      alloc_closure1(1, slots, io_core_write_bytes_flush_fn));
+}
+
+static BValue io_core_write_bytes_opened_fn(BValue handle) {
+  BValue slots[1] = { handle };
+  return io_core_write_bytes_close_fn(slots, bsts_unit_value());
+}
+
+static BValue io_core_write_bytes_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_bytes_path),
+          alloc_enum0(1)),
+      alloc_boxed_pure_fn1(io_core_write_bytes_opened_fn));
+}
+
+static BValue io_core_read_bytes_eof_assert_fn(BValue* slots, BValue arg) {
+  assert_option_none(arg, "IO/Core read_bytes should return None at EOF");
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_close(slots[0]);
+}
+
+static BValue io_core_read_bytes_second_assert_fn(BValue* slots, BValue arg) {
+  static const uint8_t expected[] = {253, 254, 255};
+  assert_option_bytes_equal(
+      arg,
+      expected,
+      (int)sizeof(expected),
+      "IO/Core read_bytes should return the remaining bytes");
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_read__bytes(slots[0], bsts_integer_from_int(4)),
+      alloc_closure1(1, slots, io_core_read_bytes_eof_assert_fn));
+}
+
+static BValue io_core_read_bytes_first_assert_fn(BValue* slots, BValue arg) {
+  static const uint8_t expected[] = {0, 1, 2};
+  assert_option_bytes_equal(
+      arg,
+      expected,
+      (int)sizeof(expected),
+      "IO/Core read_bytes should return a bounded prefix");
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_read__bytes(slots[0], bsts_integer_from_int(4)),
+      alloc_closure1(1, slots, io_core_read_bytes_second_assert_fn));
+}
+
+static BValue io_core_read_bytes_test_fn(BValue handle) {
+  BValue slots[1] = { handle };
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_read__bytes(handle, bsts_integer_from_int(3)),
+      alloc_closure1(1, slots, io_core_read_bytes_first_assert_fn));
+}
+
+static BValue io_core_read_bytes_file_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_bytes_path),
+          alloc_enum0(0)),
+      alloc_boxed_pure_fn1(io_core_read_bytes_test_fn));
+}
+
+static BValue io_core_read_all_bytes_assert_fn(BValue* slots, BValue arg) {
+  static const uint8_t expected[] = {0, 1, 2, 253, 254, 255};
+  assert_bytes_equal(
+      arg,
+      expected,
+      (int)sizeof(expected),
+      "IO/Core read_all_bytes should preserve byte ordering across chunks");
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_close(slots[0]);
+}
+
+static BValue io_core_read_all_bytes_test_fn(BValue handle) {
+  BValue slots[1] = { handle };
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_read__all__bytes(handle, bsts_integer_from_int(2)),
+      alloc_closure1(1, slots, io_core_read_all_bytes_assert_fn));
+}
+
+static BValue io_core_read_all_bytes_file_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_bytes_path),
+          alloc_enum0(0)),
+      alloc_boxed_pure_fn1(io_core_read_all_bytes_test_fn));
+}
+
+static BValue io_core_read_all_empty_assert_fn(BValue* slots, BValue arg) {
+  assert_bytes_equal(arg, NULL, 0, "IO/Core read_all_bytes should return empty bytes for an empty file");
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_close(slots[0]);
+}
+
+static BValue io_core_read_all_empty_test_fn(BValue handle) {
+  BValue slots[1] = { handle };
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_read__all__bytes(handle, bsts_integer_from_int(8)),
+      alloc_closure1(1, slots, io_core_read_all_empty_assert_fn));
+}
+
+static BValue io_core_read_all_empty_file_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_empty_path),
+          alloc_enum0(0)),
+      alloc_boxed_pure_fn1(io_core_read_all_empty_test_fn));
+}
+
+static BValue io_core_copy_bytes_close_dst_fn(BValue* slots, BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_close(slots[1]);
+}
+
+static BValue io_core_copy_bytes_close_src_fn(BValue* slots, BValue arg) {
+  assert_int_string(arg, "9", "IO/Core copy_bytes without a limit should return the copied byte count");
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_close(slots[0]),
+      alloc_closure1(2, slots, io_core_copy_bytes_close_dst_fn));
+}
+
+static BValue io_core_copy_bytes_run_fn(BValue* slots, BValue dst) {
+  BValue next_slots[2] = { slots[0], dst };
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_copy__bytes(
+          slots[0],
+          dst,
+          bsts_integer_from_int(4),
+          alloc_enum0(0)),
+      alloc_closure1(2, next_slots, io_core_copy_bytes_close_src_fn));
+}
+
+static BValue io_core_copy_bytes_open_dst_fn(BValue src) {
+  BValue slots[1] = { src };
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_copy_dst_path),
+          alloc_enum0(1)),
+      alloc_closure1(1, slots, io_core_copy_bytes_run_fn));
+}
+
+static BValue io_core_copy_bytes_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_copy_src_path),
+          alloc_enum0(0)),
+      alloc_boxed_pure_fn1(io_core_copy_bytes_open_dst_fn));
+}
+
+static BValue io_core_copy_bytes_limit_close_dst_fn(BValue* slots, BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_close(slots[1]);
+}
+
+static BValue io_core_copy_bytes_limit_close_src_fn(BValue* slots, BValue arg) {
+  assert_int_string(arg, "5", "IO/Core copy_bytes with a finite limit should return the limited count");
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_close(slots[0]),
+      alloc_closure1(2, slots, io_core_copy_bytes_limit_close_dst_fn));
+}
+
+static BValue io_core_copy_bytes_limit_run_fn(BValue* slots, BValue dst) {
+  BValue next_slots[2] = { slots[0], dst };
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_copy__bytes(
+          slots[0],
+          dst,
+          bsts_integer_from_int(3),
+          alloc_enum1(1, bsts_integer_from_int(5))),
+      alloc_closure1(2, next_slots, io_core_copy_bytes_limit_close_src_fn));
+}
+
+static BValue io_core_copy_bytes_limit_open_dst_fn(BValue src) {
+  BValue slots[1] = { src };
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_copy_limit_dst_path),
+          alloc_enum0(1)),
+      alloc_closure1(1, slots, io_core_copy_bytes_limit_run_fn));
+}
+
+static BValue io_core_copy_bytes_limit_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_copy_src_path),
+          alloc_enum0(0)),
+      alloc_boxed_pure_fn1(io_core_copy_bytes_limit_open_dst_fn));
+}
+
+static BValue io_core_invalid_utf8_read_test_fn(BValue handle) {
+  BValue slots[1] = { handle };
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_read__utf8(handle, bsts_integer_from_int(4)),
+      alloc_closure1(1, slots, io_core_close_slot0_fn));
+}
+
+static BValue io_core_invalid_utf8_file_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_invalid_utf8_path),
+          alloc_enum0(0)),
+      alloc_boxed_pure_fn1(io_core_invalid_utf8_read_test_fn));
+}
+
+static BValue io_core_write_only_read_test_fn(BValue handle) {
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_read__bytes(handle, bsts_integer_from_int(1));
+}
+
+static BValue io_core_read_from_write_only_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_write_only_path),
+          alloc_enum0(1)),
+      alloc_boxed_pure_fn1(io_core_write_only_read_test_fn));
+}
+
+static BValue io_core_read_only_write_test_fn(BValue handle) {
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_write__bytes(
+      handle,
+      bsts_bytes_empty());
+}
+
+static BValue io_core_write_to_read_only_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_open__file(
+          io_core_path_value(io_core_file_read_only_path),
+          alloc_enum0(0)),
+      alloc_boxed_pure_fn1(io_core_read_only_write_test_fn));
+}
+
+static BValue io_core_temp_file_close_fn(BValue* slots, BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_close(slots[0]);
+}
+
+static BValue io_core_temp_file_assert_fn(BValue temp_file) {
+  BValue path = get_struct_index(temp_file, 0);
+  BValue handle = get_struct_index(temp_file, 1);
+  BSTS_String_View view = bsts_string_view_ref(&path);
+  size_t name_start = 0;
+  for (size_t idx = 0; idx < view.len; idx++) {
+    if (view.bytes[idx] == '/') {
+      name_start = idx + 1;
+    }
+  }
+  static const char prefix[] = "bosatsu_test_";
+  assert(
+      view.len >= name_start + (sizeof(prefix) - 1) + 4 &&
+          memcmp(view.bytes + name_start, prefix, sizeof(prefix) - 1) == 0 &&
+          memcmp(view.bytes + view.len - 4, ".tmp", 4) == 0,
+      "IO/Core create_temp_file should preserve requested prefix and suffix");
+  char* path_copy = (char*)malloc(view.len + 1);
+  assert(path_copy != NULL, "allocating temp path copy should succeed");
+  memcpy(path_copy, view.bytes, view.len);
+  path_copy[view.len] = '\0';
+  strncpy(io_core_file_temp_created_path, path_copy, sizeof(io_core_file_temp_created_path) - 1);
+  io_core_file_temp_created_path[sizeof(io_core_file_temp_created_path) - 1] = '\0';
+  free(path_copy);
+
+  BValue slots[1] = { handle };
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_write__utf8(
+          handle,
+          bsts_string_from_utf8_bytes_static(4, "temp")),
+      alloc_closure1(1, slots, io_core_temp_file_close_fn));
+}
+
+static BValue io_core_create_temp_file_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_create__temp__file(
+          alloc_enum0(0),
+          bsts_string_from_utf8_bytes_static(13, "bosatsu_test_"),
+          bsts_string_from_utf8_bytes_static(4, ".tmp")),
+      alloc_boxed_pure_fn1(io_core_temp_file_assert_fn));
+}
+
+static BValue io_core_create_temp_dir_assert_fn(BValue path) {
+  BSTS_String_View view = bsts_string_view_ref(&path);
+  size_t name_start = 0;
+  for (size_t idx = 0; idx < view.len; idx++) {
+    if (view.bytes[idx] == '/') {
+      name_start = idx + 1;
+    }
+  }
+  static const char prefix[] = "bosatsu_test_dir_";
+  assert(
+      view.len >= name_start + (sizeof(prefix) - 1) &&
+          memcmp(view.bytes + name_start, prefix, sizeof(prefix) - 1) == 0,
+      "IO/Core create_temp_dir should preserve requested prefix");
+  char* path_copy = (char*)malloc(view.len + 1);
+  assert(path_copy != NULL, "allocating temp dir path copy should succeed");
+  memcpy(path_copy, view.bytes, view.len);
+  path_copy[view.len] = '\0';
+  strncpy(io_core_dir_temp_created_path, path_copy, sizeof(io_core_dir_temp_created_path) - 1);
+  io_core_dir_temp_created_path[sizeof(io_core_dir_temp_created_path) - 1] = '\0';
+  free(path_copy);
+  return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_unit_value());
+}
+
+static BValue io_core_create_temp_dir_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_create__temp__dir(
+          alloc_enum0(0),
+          bsts_string_from_utf8_bytes_static(17, "bosatsu_test_dir_")),
+      alloc_boxed_pure_fn1(io_core_create_temp_dir_assert_fn));
+}
+
+static BValue io_core_create_temp_dir_invalid_prefix_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_create__temp__dir(
+      alloc_enum0(0),
+      bsts_string_from_utf8_bytes_static(4, "bad/"));
+}
+
+static BValue io_core_list_missing_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_list__dir(
+      io_core_path_value(io_core_dir_missing_path));
+}
+
+static BValue io_core_mkdir_existing_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_mkdir(
+      io_core_path_value(io_core_dir_mkdir_path),
+      alloc_enum0(0));
+}
+
+static BValue io_core_remove_missing_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_remove(
+      io_core_path_value(io_core_dir_missing_path),
+      alloc_enum0(0));
+}
+
+static BValue io_core_rename_missing_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_rename(
+      io_core_path_value(io_core_dir_missing_path),
+      io_core_path_value(io_core_dir_rename_to_path));
+}
+
+static BValue io_core_stat_missing_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_stat(
+      io_core_path_value(io_core_dir_missing_path));
+}
+
+static BValue io_core_mkdir_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_mkdir(
+      io_core_path_value(io_core_dir_mkdir_path),
+      alloc_enum0(0));
+}
+
+static BValue io_core_mkdir_recursive_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_mkdir(
+      io_core_path_value(io_core_dir_mkdir_nested_path),
+      alloc_enum0(1));
+}
+
+static BValue io_core_mkdir_with_mode_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_mkdir__with__mode(
+      io_core_path_value(io_core_dir_mode_path),
+      alloc_enum0(0),
+      bsts_integer_from_int(0700));
+}
+
+static BValue io_core_list_dir_assert_fn(BValue list) {
+  const char* expected[] = {
+      io_core_dir_list_a_path,
+      io_core_dir_list_b_path
+  };
+  assert_path_list_equals(
+      list,
+      expected,
+      2,
+      "IO/Core list_dir should return sorted joined child paths");
+  return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_unit_value());
+}
+
+static BValue io_core_list_dir_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_list__dir(
+          io_core_path_value(io_core_dir_list_path)),
+      alloc_boxed_pure_fn1(io_core_list_dir_assert_fn));
+}
+
+static BValue io_core_stat_file_assert_fn(BValue stat_opt) {
+  assert_stat_kind(stat_opt, 0, "IO/Core stat should classify regular files");
+  return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_unit_value());
+}
+
+static BValue io_core_stat_file_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_stat(
+          io_core_path_value(io_core_dir_stat_file_path)),
+      alloc_boxed_pure_fn1(io_core_stat_file_assert_fn));
+}
+
+static BValue io_core_stat_dir_assert_fn(BValue stat_opt) {
+  assert_stat_kind(stat_opt, 1, "IO/Core stat should classify directories");
+  return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_unit_value());
+}
+
+static BValue io_core_stat_dir_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_stat(
+          io_core_path_value(io_core_dir_list_path)),
+      alloc_boxed_pure_fn1(io_core_stat_dir_assert_fn));
+}
+
+static BValue io_core_stat_symlink_assert_fn(BValue stat_opt) {
+  assert_stat_kind(stat_opt, 2, "IO/Core stat should classify symlinks without following them");
+  return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_unit_value());
+}
+
+static BValue io_core_stat_symlink_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_stat(
+          io_core_path_value(io_core_dir_stat_symlink_path)),
+      alloc_boxed_pure_fn1(io_core_stat_symlink_assert_fn));
+}
+
+static BValue io_core_stat_mode_assert_fn(BValue stat_opt) {
+  int mode_bits = stat_mode_bits_from_option(stat_opt) & 0777;
+  if (mode_bits != 0700) {
+    printf("IO/Core mkdir_with_mode should set requested mode bits\nexpected: 0700\ngot: 0%o\n", mode_bits);
+    exit(1);
+  }
+  return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_unit_value());
+}
+
+static BValue io_core_stat_mode_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_Prog_l_flat__map(
+      ___bsts_g_Bosatsu_l_IO_l_Core_l_stat(
+          io_core_path_value(io_core_dir_mode_path)),
+      alloc_boxed_pure_fn1(io_core_stat_mode_assert_fn));
+}
+
+static BValue io_core_remove_file_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_remove(
+      io_core_path_value(io_core_dir_remove_file_path),
+      alloc_enum0(0));
+}
+
+static BValue io_core_remove_nonempty_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_remove(
+      io_core_path_value(io_core_dir_remove_nonempty_path),
+      alloc_enum0(0));
+}
+
+static BValue io_core_remove_recursive_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_remove(
+      io_core_path_value(io_core_dir_remove_tree_path),
+      alloc_enum0(1));
+}
+
+static BValue io_core_rename_test_fn(BValue arg) {
+  (void)arg;
+  return ___bsts_g_Bosatsu_l_IO_l_Core_l_rename(
+      io_core_path_value(io_core_dir_rename_from_path),
+      io_core_path_value(io_core_dir_rename_to_path));
 }
 
 #if !defined(_WIN32)
@@ -1930,6 +2737,421 @@ void test_io_core_libuv_effects() {
   assert(
       io_core_sleep_continuations == sleep_calls_before_repeat + 3,
       "IO/Core repeated sleeps should run each continuation exactly once");
+
+  long pid = (long)uv_os_getpid();
+  snprintf(
+      io_core_file_missing_path,
+      sizeof(io_core_file_missing_path),
+      "/tmp/bosatsu-c-runtime-missing-%ld.txt",
+      pid);
+  snprintf(
+      io_core_file_existing_path,
+      sizeof(io_core_file_existing_path),
+      "/tmp/bosatsu-c-runtime-existing-%ld.txt",
+      pid);
+  snprintf(
+      io_core_file_close_path,
+      sizeof(io_core_file_close_path),
+      "/tmp/bosatsu-c-runtime-close-%ld.txt",
+      pid);
+  snprintf(
+      io_core_file_closed_read_path,
+      sizeof(io_core_file_closed_read_path),
+      "/tmp/bosatsu-c-runtime-closed-read-%ld.txt",
+      pid);
+  snprintf(
+      io_core_file_utf8_path,
+      sizeof(io_core_file_utf8_path),
+      "/tmp/bosatsu-c-runtime-utf8-%ld.txt",
+      pid);
+  snprintf(
+      io_core_file_bytes_path,
+      sizeof(io_core_file_bytes_path),
+      "/tmp/bosatsu-c-runtime-bytes-%ld.bin",
+      pid);
+  snprintf(
+      io_core_file_empty_path,
+      sizeof(io_core_file_empty_path),
+      "/tmp/bosatsu-c-runtime-empty-%ld.bin",
+      pid);
+  snprintf(
+      io_core_file_copy_src_path,
+      sizeof(io_core_file_copy_src_path),
+      "/tmp/bosatsu-c-runtime-copy-src-%ld.bin",
+      pid);
+  snprintf(
+      io_core_file_copy_dst_path,
+      sizeof(io_core_file_copy_dst_path),
+      "/tmp/bosatsu-c-runtime-copy-dst-%ld.bin",
+      pid);
+  snprintf(
+      io_core_file_copy_limit_dst_path,
+      sizeof(io_core_file_copy_limit_dst_path),
+      "/tmp/bosatsu-c-runtime-copy-limit-dst-%ld.bin",
+      pid);
+  snprintf(
+      io_core_file_invalid_utf8_path,
+      sizeof(io_core_file_invalid_utf8_path),
+      "/tmp/bosatsu-c-runtime-invalid-utf8-%ld.bin",
+      pid);
+  snprintf(
+      io_core_file_write_only_path,
+      sizeof(io_core_file_write_only_path),
+      "/tmp/bosatsu-c-runtime-write-only-%ld.bin",
+      pid);
+  snprintf(
+      io_core_file_read_only_path,
+      sizeof(io_core_file_read_only_path),
+      "/tmp/bosatsu-c-runtime-read-only-%ld.bin",
+      pid);
+  snprintf(
+      io_core_dir_root_path,
+      sizeof(io_core_dir_root_path),
+      "/tmp/bosatsu-c-runtime-dir-root-%ld",
+      pid);
+  snprintf(
+      io_core_dir_missing_path,
+      sizeof(io_core_dir_missing_path),
+      "%s/missing",
+      io_core_dir_root_path);
+  snprintf(
+      io_core_dir_mkdir_path,
+      sizeof(io_core_dir_mkdir_path),
+      "%s/mkdir-leaf",
+      io_core_dir_root_path);
+  snprintf(
+      io_core_dir_mkdir_nested_path,
+      sizeof(io_core_dir_mkdir_nested_path),
+      "%s/mkdir-parent/mkdir-child",
+      io_core_dir_root_path);
+  snprintf(
+      io_core_dir_mode_path,
+      sizeof(io_core_dir_mode_path),
+      "%s/mode-leaf",
+      io_core_dir_root_path);
+  snprintf(
+      io_core_dir_list_path,
+      sizeof(io_core_dir_list_path),
+      "%s/list-dir",
+      io_core_dir_root_path);
+  snprintf(
+      io_core_dir_list_a_path,
+      sizeof(io_core_dir_list_a_path),
+      "%s/a.txt",
+      io_core_dir_list_path);
+  snprintf(
+      io_core_dir_list_b_path,
+      sizeof(io_core_dir_list_b_path),
+      "%s/b.txt",
+      io_core_dir_list_path);
+  snprintf(
+      io_core_dir_stat_file_path,
+      sizeof(io_core_dir_stat_file_path),
+      "%s/stat-file.txt",
+      io_core_dir_root_path);
+  snprintf(
+      io_core_dir_stat_symlink_path,
+      sizeof(io_core_dir_stat_symlink_path),
+      "%s/stat-link",
+      io_core_dir_root_path);
+  snprintf(
+      io_core_dir_remove_file_path,
+      sizeof(io_core_dir_remove_file_path),
+      "%s/remove-file.txt",
+      io_core_dir_root_path);
+  snprintf(
+      io_core_dir_remove_nonempty_path,
+      sizeof(io_core_dir_remove_nonempty_path),
+      "%s/remove-nonempty",
+      io_core_dir_root_path);
+  snprintf(
+      io_core_dir_remove_nonempty_child_path,
+      sizeof(io_core_dir_remove_nonempty_child_path),
+      "%s/child.txt",
+      io_core_dir_remove_nonempty_path);
+  snprintf(
+      io_core_dir_remove_tree_path,
+      sizeof(io_core_dir_remove_tree_path),
+      "%s/remove-tree",
+      io_core_dir_root_path);
+  snprintf(
+      io_core_dir_remove_tree_child_path,
+      sizeof(io_core_dir_remove_tree_child_path),
+      "%s/child",
+      io_core_dir_remove_tree_path);
+  snprintf(
+      io_core_dir_remove_tree_file_path,
+      sizeof(io_core_dir_remove_tree_file_path),
+      "%s/payload.txt",
+      io_core_dir_remove_tree_child_path);
+  snprintf(
+      io_core_dir_rename_from_path,
+      sizeof(io_core_dir_rename_from_path),
+      "%s/rename-from.txt",
+      io_core_dir_root_path);
+  snprintf(
+      io_core_dir_rename_to_path,
+      sizeof(io_core_dir_rename_to_path),
+      "%s/rename-to.txt",
+      io_core_dir_root_path);
+  io_core_file_temp_created_path[0] = '\0';
+  io_core_dir_temp_created_path[0] = '\0';
+
+  io_core_test_unlink(io_core_file_missing_path);
+  io_core_test_unlink(io_core_file_existing_path);
+  io_core_test_unlink(io_core_file_close_path);
+  io_core_test_unlink(io_core_file_closed_read_path);
+  io_core_test_unlink(io_core_file_utf8_path);
+  io_core_test_unlink(io_core_file_bytes_path);
+  io_core_test_unlink(io_core_file_empty_path);
+  io_core_test_unlink(io_core_file_copy_src_path);
+  io_core_test_unlink(io_core_file_copy_dst_path);
+  io_core_test_unlink(io_core_file_copy_limit_dst_path);
+  io_core_test_unlink(io_core_file_invalid_utf8_path);
+  io_core_test_unlink(io_core_file_write_only_path);
+  io_core_test_unlink(io_core_file_read_only_path);
+  io_core_test_unlink(io_core_dir_stat_symlink_path);
+  io_core_test_unlink(io_core_dir_rename_to_path);
+  io_core_test_unlink(io_core_dir_rename_from_path);
+  io_core_test_unlink(io_core_dir_remove_tree_file_path);
+  io_core_test_rmdir(io_core_dir_remove_tree_child_path);
+  io_core_test_rmdir(io_core_dir_remove_tree_path);
+  io_core_test_unlink(io_core_dir_remove_nonempty_child_path);
+  io_core_test_rmdir(io_core_dir_remove_nonempty_path);
+  io_core_test_unlink(io_core_dir_remove_file_path);
+  io_core_test_unlink(io_core_dir_stat_file_path);
+  io_core_test_unlink(io_core_dir_list_a_path);
+  io_core_test_unlink(io_core_dir_list_b_path);
+  io_core_test_rmdir(io_core_dir_list_path);
+  io_core_test_rmdir(io_core_dir_mode_path);
+  io_core_test_rmdir(io_core_dir_mkdir_nested_path);
+  char io_core_dir_mkdir_parent_path[PATH_MAX];
+  snprintf(
+      io_core_dir_mkdir_parent_path,
+      sizeof(io_core_dir_mkdir_parent_path),
+      "%s/mkdir-parent",
+      io_core_dir_root_path);
+  io_core_test_rmdir(io_core_dir_mkdir_parent_path);
+  io_core_test_rmdir(io_core_dir_mkdir_path);
+  io_core_test_rmdir(io_core_dir_root_path);
+
+  FILE* existing = fopen(io_core_file_existing_path, "wb");
+  assert(existing != NULL, "creating existing file fixture should succeed");
+  assert(fclose(existing) == 0, "closing existing file fixture should succeed");
+  static const uint8_t bytes_payload[] = {0, 1, 2, 253, 254, 255};
+  static const uint8_t copy_payload[] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'};
+  static const uint8_t invalid_utf8_payload[] = {0xff, 0x61};
+  io_core_write_fixture(io_core_file_empty_path, NULL, 0);
+  io_core_write_fixture(io_core_file_copy_src_path, copy_payload, sizeof(copy_payload));
+  io_core_write_fixture(io_core_file_invalid_utf8_path, invalid_utf8_payload, sizeof(invalid_utf8_payload));
+  io_core_write_fixture(io_core_file_read_only_path, bytes_payload, sizeof(bytes_payload));
+  io_core_test_mkdir(io_core_dir_root_path);
+  io_core_test_mkdir(io_core_dir_list_path);
+  io_core_write_fixture(io_core_dir_list_b_path, bytes_payload, sizeof(bytes_payload));
+  io_core_write_fixture(io_core_dir_list_a_path, bytes_payload, sizeof(bytes_payload));
+  io_core_write_fixture(io_core_dir_stat_file_path, bytes_payload, sizeof(bytes_payload));
+  io_core_write_fixture(io_core_dir_remove_file_path, bytes_payload, sizeof(bytes_payload));
+  io_core_test_mkdir(io_core_dir_remove_nonempty_path);
+  io_core_write_fixture(io_core_dir_remove_nonempty_child_path, bytes_payload, sizeof(bytes_payload));
+  io_core_test_mkdir(io_core_dir_remove_tree_path);
+  io_core_test_mkdir(io_core_dir_remove_tree_child_path);
+  io_core_write_fixture(io_core_dir_remove_tree_file_path, bytes_payload, sizeof(bytes_payload));
+  io_core_write_fixture(io_core_dir_rename_from_path, bytes_payload, sizeof(bytes_payload));
+  assert(symlink(io_core_dir_stat_file_path, io_core_dir_stat_symlink_path) == 0, "creating IO/Core symlink fixture should succeed");
+
+  assert_prog_error_variant(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_open_missing_read_test_fn)),
+      0,
+      "IO/Core open_file Read should map a missing path to NotFound");
+  assert_prog_error_variant(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_create_new_existing_test_fn)),
+      2,
+      "IO/Core open_file CreateNew should map an existing path to AlreadyExists");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_close_twice_test_fn)),
+      "IO/Core close should be idempotent for runtime-owned handles");
+  assert_prog_error_variant(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_read_closed_handle_test_fn)),
+      14,
+      "IO/Core read on a closed runtime-owned handle should raise BadFileDescriptor");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_write_utf8_test_fn)),
+      "IO/Core write_utf8 and flush should succeed on a writable runtime-owned handle");
+  uint8_t utf8_readback[8];
+  io_core_read_fixture(
+      io_core_file_utf8_path,
+      utf8_readback,
+      sizeof(utf8_readback),
+      "IO/Core write_utf8 should persist exact UTF-8 bytes");
+  assert(memcmp(utf8_readback, "hello-\xc2\xb5", sizeof(utf8_readback)) == 0, "IO/Core write_utf8 persisted bytes should match");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_read_utf8_file_test_fn)),
+      "IO/Core read_utf8 should read text then return EOF");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_write_bytes_test_fn)),
+      "IO/Core write_bytes and flush should succeed on a writable runtime-owned handle");
+  uint8_t bytes_readback[sizeof(bytes_payload)];
+  io_core_read_fixture(
+      io_core_file_bytes_path,
+      bytes_readback,
+      sizeof(bytes_readback),
+      "IO/Core write_bytes should persist exact bytes");
+  assert(memcmp(bytes_readback, bytes_payload, sizeof(bytes_payload)) == 0, "IO/Core write_bytes persisted bytes should match");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_read_bytes_file_test_fn)),
+      "IO/Core read_bytes should read bounded chunks then return EOF");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_read_all_bytes_file_test_fn)),
+      "IO/Core read_all_bytes should read all bytes across chunks");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_read_all_empty_file_test_fn)),
+      "IO/Core read_all_bytes should return empty bytes for an empty file");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_copy_bytes_test_fn)),
+      "IO/Core copy_bytes should copy all bytes without a limit");
+  uint8_t copy_readback[sizeof(copy_payload)];
+  io_core_read_fixture(
+      io_core_file_copy_dst_path,
+      copy_readback,
+      sizeof(copy_readback),
+      "IO/Core copy_bytes should write all source bytes");
+  assert(memcmp(copy_readback, copy_payload, sizeof(copy_payload)) == 0, "IO/Core copy_bytes destination should match source");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_copy_bytes_limit_test_fn)),
+      "IO/Core copy_bytes should respect a finite max_total");
+  uint8_t copy_limit_readback[5];
+  io_core_read_fixture(
+      io_core_file_copy_limit_dst_path,
+      copy_limit_readback,
+      sizeof(copy_limit_readback),
+      "IO/Core copy_bytes with max_total should write only the prefix");
+  assert(memcmp(copy_limit_readback, copy_payload, sizeof(copy_limit_readback)) == 0, "IO/Core limited copy destination should match source prefix");
+  assert_prog_error_variant(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_invalid_utf8_file_test_fn)),
+      13,
+      "IO/Core read_utf8 should map invalid bytes to InvalidUtf8");
+  assert_prog_error_variant(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_read_from_write_only_test_fn)),
+      14,
+      "IO/Core read_bytes on a write-only handle should raise BadFileDescriptor");
+  assert_prog_error_variant(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_write_to_read_only_test_fn)),
+      14,
+      "IO/Core write_bytes on a read-only handle should raise BadFileDescriptor");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_create_temp_file_test_fn)),
+      "IO/Core create_temp_file should return a writable uv_file-backed handle");
+  if (io_core_file_temp_created_path[0] != '\0') {
+    uint8_t temp_readback[4];
+    io_core_read_fixture(
+        io_core_file_temp_created_path,
+        temp_readback,
+        sizeof(temp_readback),
+        "IO/Core temp file handle should write through to the created file");
+    assert(memcmp(temp_readback, "temp", sizeof(temp_readback)) == 0, "IO/Core temp file contents should match written data");
+  }
+  assert_prog_success_option_none(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_stat_missing_test_fn)),
+      "IO/Core stat should return None for a missing path");
+  assert_prog_error_variant(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_list_missing_test_fn)),
+      0,
+      "IO/Core list_dir should map a missing path to NotFound");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_create_temp_dir_test_fn)),
+      "IO/Core create_temp_dir should return a created directory path");
+  assert_prog_error_variant(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_create_temp_dir_invalid_prefix_test_fn)),
+      12,
+      "IO/Core create_temp_dir should reject invalid prefixes");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_mkdir_test_fn)),
+      "IO/Core mkdir should create a leaf directory");
+  assert_prog_error_variant(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_mkdir_existing_test_fn)),
+      2,
+      "IO/Core mkdir should map an existing path to AlreadyExists");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_mkdir_recursive_test_fn)),
+      "IO/Core recursive mkdir should create parent directories");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_mkdir_with_mode_test_fn)),
+      "IO/Core mkdir_with_mode should create a directory with requested mode bits");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_stat_mode_test_fn)),
+      "IO/Core stat should expose mkdir_with_mode mode bits");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_list_dir_test_fn)),
+      "IO/Core list_dir should return sorted joined child paths");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_stat_file_test_fn)),
+      "IO/Core stat should classify files");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_stat_dir_test_fn)),
+      "IO/Core stat should classify directories");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_stat_symlink_test_fn)),
+      "IO/Core stat should classify symlinks");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_remove_file_test_fn)),
+      "IO/Core remove should unlink files");
+  assert_prog_error_variant(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_remove_nonempty_test_fn)),
+      5,
+      "IO/Core non-recursive remove should reject non-empty directories");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_remove_recursive_test_fn)),
+      "IO/Core recursive remove should delete nested trees");
+  assert(
+      !io_core_test_path_exists(io_core_dir_remove_tree_path),
+      "IO/Core recursive remove should remove the tree root");
+  (void)assert_prog_success(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_rename_test_fn)),
+      "IO/Core rename should move a path");
+  assert(
+      !io_core_test_path_exists(io_core_dir_rename_from_path) &&
+          io_core_test_path_exists(io_core_dir_rename_to_path),
+      "IO/Core rename should move the source to the destination");
+  assert_prog_error_variant(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_rename_missing_test_fn)),
+      0,
+      "IO/Core rename should map a missing source to NotFound");
+  assert_prog_error_variant(
+      bsts_Bosatsu_Prog_run_test(alloc_boxed_pure_fn1(io_core_remove_missing_test_fn)),
+      0,
+      "IO/Core remove should map a missing path to NotFound");
+
+  io_core_test_unlink(io_core_file_existing_path);
+  io_core_test_unlink(io_core_file_close_path);
+  io_core_test_unlink(io_core_file_closed_read_path);
+  io_core_test_unlink(io_core_file_utf8_path);
+  io_core_test_unlink(io_core_file_bytes_path);
+  io_core_test_unlink(io_core_file_empty_path);
+  io_core_test_unlink(io_core_file_copy_src_path);
+  io_core_test_unlink(io_core_file_copy_dst_path);
+  io_core_test_unlink(io_core_file_copy_limit_dst_path);
+  io_core_test_unlink(io_core_file_invalid_utf8_path);
+  io_core_test_unlink(io_core_file_write_only_path);
+  io_core_test_unlink(io_core_file_read_only_path);
+  if (io_core_file_temp_created_path[0] != '\0') {
+    io_core_test_unlink(io_core_file_temp_created_path);
+  }
+  if (io_core_dir_temp_created_path[0] != '\0') {
+    io_core_test_rmdir(io_core_dir_temp_created_path);
+  }
+  io_core_test_unlink(io_core_dir_stat_symlink_path);
+  io_core_test_unlink(io_core_dir_rename_to_path);
+  io_core_test_unlink(io_core_dir_remove_nonempty_child_path);
+  io_core_test_rmdir(io_core_dir_remove_nonempty_path);
+  io_core_test_unlink(io_core_dir_stat_file_path);
+  io_core_test_unlink(io_core_dir_list_a_path);
+  io_core_test_unlink(io_core_dir_list_b_path);
+  io_core_test_rmdir(io_core_dir_list_path);
+  io_core_test_rmdir(io_core_dir_mode_path);
+  io_core_test_rmdir(io_core_dir_mkdir_nested_path);
+  io_core_test_rmdir(io_core_dir_mkdir_parent_path);
+  io_core_test_rmdir(io_core_dir_mkdir_path);
+  io_core_test_rmdir(io_core_dir_root_path);
 }
 
 void test_prog_runner_loop() {
@@ -2053,6 +3275,7 @@ int main(int argc, char** argv) {
   test_array_int64();
   test_prog_assoc();
   test_prog_runner_loop();
+  test_io_core_uv_chunk_sizes();
   test_io_core_libuv_effects();
   printf("success\n");
   return 0;
