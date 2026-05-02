@@ -393,11 +393,12 @@ class _CoreHandle:
         self.closed = False
 
 class _CoreProcess:
-    __slots__ = ("process", "exit_code")
+    __slots__ = ("process", "exit_code", "lock")
 
     def __init__(self, process):
         self.process = process
         self.exit_code = None
+        self.lock = threading.RLock()
 
 def _normalize_process_exit_code(code):
     code = int(code)
@@ -411,9 +412,53 @@ def _record_process_exit_code(proc_value, code):
     return proc_value.exit_code
 
 def _wait_core_process(proc_value):
-    if proc_value.exit_code is not None:
-        return proc_value.exit_code
-    return _record_process_exit_code(proc_value, proc_value.process.wait())
+    with proc_value.lock:
+        if proc_value.exit_code is not None:
+            return proc_value.exit_code
+        return _record_process_exit_code(proc_value, proc_value.process.wait())
+
+def _poll_core_process(proc_value):
+    with proc_value.lock:
+        if proc_value.exit_code is not None:
+            return proc_value.exit_code
+        code = proc_value.process.poll()
+        if code is None:
+            return None
+        return _record_process_exit_code(proc_value, code)
+
+def _timeout_seconds_from_nanos(nanos: int):
+    if nanos <= 0:
+        return 0.0
+    timeout_max = getattr(threading, "TIMEOUT_MAX", float("inf"))
+    if math.isfinite(timeout_max):
+        timeout_max_nanos = int(timeout_max * 1_000_000_000)
+        if nanos >= timeout_max_nanos:
+            return timeout_max
+    elif nanos > int(sys.float_info.max):
+        return sys.float_info.max / 1_000_000_000.0
+    return max(float(nanos) / 1_000_000_000.0, 1e-9)
+
+def _wait_timeout_core_process(proc_value, nanos: int):
+    with proc_value.lock:
+        if proc_value.exit_code is not None:
+            return proc_value.exit_code
+        if nanos <= 0:
+            return _poll_core_process(proc_value)
+        try:
+            code = proc_value.process.wait(timeout=_timeout_seconds_from_nanos(nanos))
+        except subprocess.TimeoutExpired:
+            return None
+        return _record_process_exit_code(proc_value, code)
+
+def _stop_core_process(proc_value, force: bool):
+    with proc_value.lock:
+        if _poll_core_process(proc_value) is not None:
+            return False
+        if force:
+            proc_value.process.kill()
+        else:
+            proc_value.process.terminate()
+        return True
 
 def _invalid_argument(context: str):
     return _ioerr(_IOERR_INVALID_ARGUMENT, context)
@@ -1615,6 +1660,59 @@ def wait_process(proc_value):
             return pure(_wait_core_process(proc_value))
         except OSError as exc:
             return raise_error(_ioerror_from_errno(exc.errno, "waiting on process"))
+
+    return effect(fn)
+
+_STOP_SENT = 0
+_ALREADY_EXITED = 1
+
+def terminate_process(proc_value):
+    def fn():
+        if not isinstance(proc_value, _CoreProcess):
+            return raise_error(_invalid_argument("terminate expects a process handle"))
+        try:
+            return pure(_STOP_SENT if _stop_core_process(proc_value, False) else _ALREADY_EXITED)
+        except OSError as exc:
+            return raise_error(_ioerror_from_errno(exc.errno, "terminating process"))
+
+    return effect(fn)
+
+def kill_process(proc_value):
+    def fn():
+        if not isinstance(proc_value, _CoreProcess):
+            return raise_error(_invalid_argument("kill expects a process handle"))
+        try:
+            return pure(_STOP_SENT if _stop_core_process(proc_value, True) else _ALREADY_EXITED)
+        except OSError as exc:
+            return raise_error(_ioerror_from_errno(exc.errno, "killing process"))
+
+    return effect(fn)
+
+def poll_process(proc_value):
+    def fn():
+        if not isinstance(proc_value, _CoreProcess):
+            return raise_error(_invalid_argument("poll expects a process handle"))
+        try:
+            code = _poll_core_process(proc_value)
+            return pure(_none if code is None else _some(code))
+        except OSError as exc:
+            return raise_error(_ioerror_from_errno(exc.errno, "polling process"))
+
+    return effect(fn)
+
+def wait_timeout_process(proc_value, duration):
+    def fn():
+        if not isinstance(proc_value, _CoreProcess):
+            return raise_error(_invalid_argument("wait_timeout expects a process handle"))
+        try:
+            nanos = _to_duration_nanos(duration)
+        except ValueError as exc:
+            return raise_error(_invalid_argument(str(exc)))
+        try:
+            code = _wait_timeout_core_process(proc_value, nanos)
+            return pure(_none if code is None else _some(code))
+        except OSError as exc:
+            return raise_error(_ioerror_from_errno(exc.errno, "waiting on process with timeout"))
 
     return effect(fn)
 

@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <signal.h>
 #if defined(__linux__)
 #include <sys/syscall.h>
 #endif
@@ -95,6 +96,10 @@ typedef struct
 
 #define BSTS_CORE_PROCESS_MAGIC 0x42505350u
 
+// Wait requests link back to the owning process, and the process stores the
+// currently pending request, so forward-declare the recursive request type.
+typedef struct BSTS_Core_Wait_Request BSTS_Core_Wait_Request;
+
 typedef struct BSTS_Core_Process
 {
   uint32_t magic;
@@ -105,10 +110,11 @@ typedef struct BSTS_Core_Process
   int exit_code;
   int term_signal;
   int close_started;
-  BSTS_Prog_Suspended *wait_suspended;
+  BSTS_Core_Wait_Request *wait_request;
 } BSTS_Core_Process;
 
 static BSTS_Core_Process *bsts_core_active_processes = NULL;
+static uint64_t bsts_timeout_millis_from_nanos_value(BValue nanos_value);
 
 typedef struct
 {
@@ -126,11 +132,16 @@ typedef struct
   BValue stdio_results[3];
 } BSTS_Core_Spawn_Request;
 
-typedef struct
+struct BSTS_Core_Wait_Request
 {
   BSTS_Core_Process *process;
   BSTS_Prog_Suspended *suspended;
-} BSTS_Core_Wait_Request;
+  uv_timer_t timer;
+  uint64_t timeout_millis;
+  int has_timer;
+  BValue result;
+  int result_is_error;
+};
 
 static BValue bsts_ioerror_context(const char *context)
 {
@@ -420,6 +431,11 @@ static unsigned int bsts_core_uv_io_chunk_size(size_t len)
 unsigned int bsts_core_test_uv_io_chunk_size(size_t len)
 {
   return bsts_core_uv_io_chunk_size(len);
+}
+
+uint64_t bsts_core_test_timeout_millis_from_nanos(BValue nanos_value)
+{
+  return bsts_timeout_millis_from_nanos_value(nanos_value);
 }
 
 static ssize_t bsts_core_uv_read(uv_file file, void *data, size_t len, const char *context)
@@ -2619,6 +2635,21 @@ static BValue bsts_core_process_exit_value(BSTS_Core_Process *process)
   return bsts_integer_from_int(code);
 }
 
+static BValue bsts_core_stop_sent(void)
+{
+  return alloc_enum0(0);
+}
+
+static BValue bsts_core_already_exited(void)
+{
+  return alloc_enum0(1);
+}
+
+static BValue bsts_core_process_exit_option(BSTS_Core_Process *process)
+{
+  return bsts_option_some(bsts_core_process_exit_value(process));
+}
+
 static void bsts_core_process_root_active(BSTS_Core_Process *process)
 {
   process->active_prev = NULL;
@@ -2671,6 +2702,37 @@ static void bsts_core_process_maybe_close(BSTS_Core_Process *process)
   }
 }
 
+static void bsts_core_wait_timeout_close_cb(uv_handle_t *handle)
+{
+  BSTS_Core_Wait_Request *request = (BSTS_Core_Wait_Request *)handle->data;
+  if (request->result_is_error)
+  {
+    bsts_Bosatsu_Prog_suspended_error(request->suspended, request->result);
+  }
+  else
+  {
+    bsts_Bosatsu_Prog_suspended_success(request->suspended, request->result);
+  }
+}
+
+static void bsts_core_wait_request_success(
+    BSTS_Core_Wait_Request *request,
+    BValue result)
+{
+  if (request->has_timer)
+  {
+    request->process = NULL;
+    request->result = result;
+    request->result_is_error = 0;
+    uv_timer_stop(&request->timer);
+    uv_close((uv_handle_t *)&request->timer, bsts_core_wait_timeout_close_cb);
+  }
+  else
+  {
+    bsts_Bosatsu_Prog_suspended_success(request->suspended, result);
+  }
+}
+
 static void bsts_core_process_exit_cb(
     uv_process_t *uv_process,
     int64_t exit_status,
@@ -2681,13 +2743,14 @@ static void bsts_core_process_exit_cb(
   process->exit_code = (int)exit_status;
   process->term_signal = term_signal;
 
-  BSTS_Prog_Suspended *suspended = process->wait_suspended;
-  if (suspended != NULL)
+  BSTS_Core_Wait_Request *request = process->wait_request;
+  if (request != NULL)
   {
-    process->wait_suspended = NULL;
-    bsts_Bosatsu_Prog_suspended_success(
-        suspended,
-        bsts_core_process_exit_value(process));
+    process->wait_request = NULL;
+    BValue result = request->has_timer
+        ? bsts_core_process_exit_option(process)
+        : bsts_core_process_exit_value(process);
+    bsts_core_wait_request_success(request, result);
   }
   bsts_core_process_maybe_close(process);
 }
@@ -2822,7 +2885,7 @@ static int bsts_core_wait_start(BSTS_Prog_Suspended *suspended)
         bsts_core_process_exit_value(request->process));
     return 0;
   }
-  request->process->wait_suspended = suspended;
+  request->process->wait_request = request;
   return 0;
 }
 
@@ -2835,7 +2898,7 @@ static BValue bsts_core_wait_effect(BValue process)
         bsts_ioerror_bad_fd("waiting on invalid process"));
   }
 
-  if (process_state->wait_suspended != NULL)
+  if (process_state->wait_request != NULL)
   {
     return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
         bsts_ioerror_bad_fd("process wait already pending"));
@@ -2856,10 +2919,169 @@ static BValue bsts_core_wait_effect(BValue process)
   }
   request->process = process_state;
   request->suspended = NULL;
+  request->timeout_millis = 0;
+  request->has_timer = 0;
+  request->result = bsts_unit_value();
+  request->result_is_error = 0;
   BValue suspended = bsts_Bosatsu_Prog_suspend(
       BSTS_VALUE_FROM_PTR(request),
       bsts_core_wait_start);
   GC_reachable_here(process);
+  return suspended;
+}
+
+static BValue bsts_core_poll_effect(BValue process)
+{
+  BSTS_Core_Process *process_state = bsts_core_unbox_process(process);
+  if (process_state == NULL)
+  {
+    return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
+        bsts_ioerror_bad_fd("polling invalid process"));
+  }
+
+  BValue result = process_state->exited
+      ? bsts_core_process_exit_option(process_state)
+      : bsts_option_none();
+  GC_reachable_here(process);
+  return ___bsts_g_Bosatsu_l_Prog_l_pure(result);
+}
+
+static BValue bsts_core_stop_process_effect(BValue args2)
+{
+  BValue process = get_struct_index(args2, 0);
+  BValue signal_value = get_struct_index(args2, 1);
+  BSTS_Core_Process *process_state = bsts_core_unbox_process(process);
+  if (process_state == NULL)
+  {
+    return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
+        bsts_ioerror_bad_fd("stopping invalid process"));
+  }
+
+  if (process_state->exited)
+  {
+    GC_reachable_here(args2);
+    return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_core_already_exited());
+  }
+
+  int signal_number = (int)bsts_integer_to_low_uint64(signal_value);
+  int kill_result = uv_process_kill(&process_state->process, signal_number);
+  GC_reachable_here(args2);
+  if (kill_result != 0)
+  {
+    return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
+        bsts_ioerror_from_uv(kill_result, "stopping process"));
+  }
+
+  return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_core_stop_sent());
+}
+
+static void bsts_core_wait_timeout_timer_cb(uv_timer_t *timer)
+{
+  BSTS_Core_Wait_Request *request = (BSTS_Core_Wait_Request *)timer->data;
+  if (request->process != NULL && request->process->wait_request == request)
+  {
+    request->process->wait_request = NULL;
+  }
+  request->process = NULL;
+  request->result = bsts_option_none();
+  request->result_is_error = 0;
+  uv_timer_stop(timer);
+  uv_close((uv_handle_t *)timer, bsts_core_wait_timeout_close_cb);
+}
+
+static int bsts_core_wait_timeout_start(BSTS_Prog_Suspended *suspended)
+{
+  BSTS_Core_Wait_Request *request =
+      BSTS_PTR(BSTS_Core_Wait_Request, bsts_Bosatsu_Prog_suspended_request(suspended));
+  request->suspended = suspended;
+
+  if (request->process->exited)
+  {
+    bsts_Bosatsu_Prog_suspended_success(
+        suspended,
+        bsts_core_process_exit_option(request->process));
+    return 0;
+  }
+
+  int timer_result = uv_timer_init(
+      bsts_Bosatsu_Prog_suspended_loop(suspended),
+      &request->timer);
+  if (timer_result != 0)
+  {
+    bsts_Bosatsu_Prog_suspended_error(
+        suspended,
+        bsts_ioerror_from_uv(timer_result, "starting process wait timeout timer"));
+    return 0;
+  }
+
+  request->timer.data = request;
+  request->process->wait_request = request;
+  timer_result = uv_timer_start(
+      &request->timer,
+      bsts_core_wait_timeout_timer_cb,
+      request->timeout_millis,
+      0);
+  if (timer_result != 0)
+  {
+    request->process->wait_request = NULL;
+    request->process = NULL;
+    request->result = bsts_ioerror_from_uv(
+        timer_result,
+        "starting process wait timeout timer");
+    request->result_is_error = 1;
+    uv_close((uv_handle_t *)&request->timer, bsts_core_wait_timeout_close_cb);
+  }
+  return 0;
+}
+
+static BValue bsts_core_wait_timeout_effect(BValue args2)
+{
+  BValue process = get_struct_index(args2, 0);
+  BValue duration = get_struct_index(args2, 1);
+  BSTS_Core_Process *process_state = bsts_core_unbox_process(process);
+  if (process_state == NULL)
+  {
+    return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
+        bsts_ioerror_bad_fd("waiting with timeout on invalid process"));
+  }
+
+  if (process_state->wait_request != NULL)
+  {
+    return ___bsts_g_Bosatsu_l_Prog_l_raise__error(
+        bsts_ioerror_bad_fd("process wait already pending"));
+  }
+
+  if (process_state->exited)
+  {
+    return ___bsts_g_Bosatsu_l_Prog_l_pure(
+        bsts_core_process_exit_option(process_state));
+  }
+
+  BValue zero = bsts_integer_from_int(0);
+  if (bsts_integer_cmp(duration, zero) <= 0)
+  {
+    // This early return does not reach the later keep-alive after suspend.
+    GC_reachable_here(args2);
+    return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_option_none());
+  }
+
+  BSTS_Core_Wait_Request *request =
+      (BSTS_Core_Wait_Request *)GC_malloc(sizeof(BSTS_Core_Wait_Request));
+  if (request == NULL)
+  {
+    perror("GC_malloc failure in bsts_core_wait_timeout_effect");
+    abort();
+  }
+  request->process = process_state;
+  request->suspended = NULL;
+  request->timeout_millis = bsts_timeout_millis_from_nanos_value(duration);
+  request->has_timer = 1;
+  request->result = bsts_unit_value();
+  request->result_is_error = 0;
+  BValue suspended = bsts_Bosatsu_Prog_suspend(
+      BSTS_VALUE_FROM_PTR(request),
+      bsts_core_wait_timeout_start);
+  GC_reachable_here(args2);
   return suspended;
 }
 
@@ -2887,11 +3109,37 @@ static BValue bsts_core_now_mono_effect(BValue unit)
   return ___bsts_g_Bosatsu_l_Prog_l_pure(bsts_integer_from_uint64(uv_hrtime()));
 }
 
-static uint64_t bsts_sleep_timeout_millis(uint64_t nanos)
+static uint64_t bsts_timeout_millis_from_nanos_value(BValue nanos_value)
 {
-  uint64_t millis = nanos / 1000000ULL;
-  if ((nanos % 1000000ULL) != 0ULL)
+  BValue zero = bsts_integer_from_int(0);
+  if (bsts_integer_cmp(nanos_value, zero) <= 0)
   {
+    return 0ULL;
+  }
+
+  BValue divmod = bsts_integer_div_mod(
+      nanos_value,
+      bsts_integer_from_int(1000000));
+  BValue millis_value = get_struct_index(divmod, 0);
+  BValue nanos_remainder = get_struct_index(divmod, 1);
+  static BValue max_millis_value = 0;
+  if (max_millis_value == 0)
+  {
+    max_millis_value = bsts_integer_from_uint64(UINT64_MAX);
+  }
+
+  if (bsts_integer_cmp(millis_value, max_millis_value) > 0)
+  {
+    return UINT64_MAX;
+  }
+
+  uint64_t millis = bsts_integer_to_low_uint64(millis_value);
+  if (!bsts_integer_is_zero(nanos_remainder))
+  {
+    if (millis == UINT64_MAX)
+    {
+      return UINT64_MAX;
+    }
     millis += 1ULL;
   }
   return millis;
@@ -2970,8 +3218,7 @@ static BValue bsts_core_sleep_effect(BValue duration)
   }
 
   request->suspended = NULL;
-  request->timeout_millis =
-      bsts_sleep_timeout_millis(bsts_integer_to_low_uint64(nanos_value));
+  request->timeout_millis = bsts_timeout_millis_from_nanos_value(nanos_value);
   request->error = bsts_unit_value();
   request->is_error = 0;
   BValue suspended = bsts_Bosatsu_Prog_suspend(
@@ -3100,6 +3347,44 @@ BValue ___bsts_g_Bosatsu_l_IO_l_Core_l_spawn(BValue cmd, BValue args, BValue std
 BValue ___bsts_g_Bosatsu_l_IO_l_Core_l_wait(BValue process)
 {
   return bsts_prog_effect1(process, bsts_core_wait_effect);
+}
+
+BValue ___bsts_g_Bosatsu_l_IO_l_Core_l_terminate(BValue process)
+{
+#ifdef SIGTERM
+  int signal_number = SIGTERM;
+#else
+  int signal_number = 15;
+#endif
+  return bsts_prog_effect2(
+      process,
+      bsts_integer_from_int(signal_number),
+      bsts_core_stop_process_effect);
+}
+
+BValue ___bsts_g_Bosatsu_l_IO_l_Core_l_kill(BValue process)
+{
+#ifdef SIGKILL
+  int signal_number = SIGKILL;
+#elif defined(SIGTERM)
+  int signal_number = SIGTERM;
+#else
+  int signal_number = 9;
+#endif
+  return bsts_prog_effect2(
+      process,
+      bsts_integer_from_int(signal_number),
+      bsts_core_stop_process_effect);
+}
+
+BValue ___bsts_g_Bosatsu_l_IO_l_Core_l_poll(BValue process)
+{
+  return bsts_prog_effect1(process, bsts_core_poll_effect);
+}
+
+BValue ___bsts_g_Bosatsu_l_IO_l_Core_l_wait__timeout(BValue process, BValue duration)
+{
+  return bsts_prog_effect2(process, duration, bsts_core_wait_timeout_effect);
 }
 
 BValue ___bsts_g_Bosatsu_l_IO_l_Core_l_now__wall()
